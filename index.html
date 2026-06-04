@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>日本站运费核算</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-labelledby="page-title">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Amazon JP Fulfillment</p>
+            <h1 id="page-title">日本站运费核算</h1>
+          </div>
+          <div class="rate-note">人民币 / CM / KG</div>
+        </header>
+
+        <section class="calculator-grid">
+          <form class="input-panel" id="shipment-form" autocomplete="off">
+            <div class="panel-heading">
+              <h2>包裹信息</h2>
+              <button class="ghost-button" id="reset-button" type="button">清空</button>
+            </div>
+
+            <div class="field-grid">
+              <label class="field">
+                <span>长度</span>
+                <div class="input-unit">
+                  <input id="length" name="length" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0">
+                  <span>cm</span>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>宽度</span>
+                <div class="input-unit">
+                  <input id="width" name="width" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0">
+                  <span>cm</span>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>高度</span>
+                <div class="input-unit">
+                  <input id="height" name="height" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0">
+                  <span>cm</span>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>实际重量</span>
+                <div class="input-unit">
+                  <input id="weight" name="weight" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">
+                  <span>kg</span>
+                </div>
+              </label>
+            </div>
+
+            <label class="field full-field">
+              <span>发往地区</span>
+              <select id="prefecture" name="prefecture"></select>
+            </label>
+
+            <div class="metric-row">
+              <div>
+                <span class="metric-label">三边合计</span>
+                <strong id="dimension-sum">--</strong>
+              </div>
+              <div>
+                <span class="metric-label">体积重</span>
+                <strong id="volume-weight">--</strong>
+              </div>
+              <div>
+                <span class="metric-label">地区类型</span>
+                <strong id="region-kind">普通地区</strong>
+              </div>
+            </div>
+          </form>
+
+          <aside class="summary-panel" aria-live="polite">
+            <p class="summary-label">当前推荐</p>
+            <div id="best-card" class="best-card empty">
+              <span>输入包裹规格后自动核算</span>
+            </div>
+          </aside>
+        </section>
+
+        <section class="results-panel">
+          <div class="panel-heading">
+            <h2>快递报价</h2>
+            <div class="legend">
+              <span><i class="dot ok"></i>可选</span>
+              <span><i class="dot warn"></i>不推荐</span>
+              <span><i class="dot off"></i>不可选</span>
+            </div>
+          </div>
+
+          <div class="desktop-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>快递</th>
+                  <th>状态</th>
+                  <th>重量档</th>
+                  <th>计费重</th>
+                  <th>计费方式</th>
+                  <th>附加费</th>
+                  <th>合计</th>
+                </tr>
+              </thead>
+              <tbody id="results-body">
+                <tr>
+                  <td colspan="7" class="empty-row">等待输入包裹规格</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mobile-results" id="mobile-results"></div>
+        </section>
+
+        <section class="rules-panel">
+          <h2>计费边界</h2>
+          <div class="rule-list">
+            <span>重量边界按后一档</span>
+            <span>首重按 0.5kg，续重按每 1kg 向上取整</span>
+            <span>全抛体积重 = 长 × 宽 × 高 ÷ 6000</span>
+            <span>半抛计费重 = 实重与半抛重取较大值</span>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
