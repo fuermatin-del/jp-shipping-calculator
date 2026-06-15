@@ -1,4 +1,4 @@
-const prefectures = [
+﻿const prefectures = [
   ["ordinary", "普通地区"],
   ["hokkaido", "北海道"],
   ["okinawa", "冲绳"],
@@ -67,24 +67,25 @@ const carriers = [
         return {
           base: 28,
           step: 6,
-          label: "小包首重28元 + 续重6元/kg",
+          label: "小包首重28元 + 续重6元/500g",
           bracketOverride: { id: "small-0.5", label: "0-0.5kg小包" },
         };
       }
       if (["0-0.5", "0.5-2.5", "2.5-5"].includes(bracket.id)) {
-        return { base: 35, step: 5, label: "首重35元 + 续重5元/kg" };
+        return { base: 35, step: 5, label: "首重35元 + 续重5元/500g" };
       }
       if (bracket.id === "5-10") {
-        return { base: 35.5, step: 5.5, label: "首重35.5元 + 续重5.5元/kg" };
+        return { base: 35.5, step: 5.5, label: "首重35.5元 + 续重5.5元/500g" };
       }
       if (bracket.id === "10-20") {
-        return { base: 36, step: 6, label: "首重36元 + 续重6元/kg", notRecommended: "10kg以上尽量不选" };
+        return { base: 36, step: 6, label: "首重36元 + 续重6元/500g", notRecommended: "10kg以上尽量不选" };
       }
       return { unavailable: "超过可选重量范围" };
     },
   },
   {
     name: "OCS",
+    finalSurcharge: { fee: 1.5, note: "OCS固定附加费 1.5元" },
     dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
       if (sum < 120) return { mode: "免抛", billableWeight: actualWeight };
       if (sum < 260) return { mode: "全抛", billableWeight: fullThrowWeight(actualWeight, length, width, height) };
@@ -92,16 +93,16 @@ const carriers = [
     },
     rateFor: ({ bracket }) => {
       if (["0-0.5", "0.5-2.5"].includes(bracket.id)) {
-        return { base: 31, step: 5, label: "首重31元 + 续重5元/kg" };
+        return { base: 31, step: 5, label: "首重31元 + 续重5元/500g" };
       }
       if (bracket.id === "2.5-5") {
-        return { base: 31, step: 7, label: "首重31元 + 续重7元/kg" };
+        return { base: 31, step: 7, label: "首重31元 + 续重7元/500g" };
       }
       if (bracket.id === "5-10") {
-        return { base: 32, step: 7, label: "首重32元 + 续重7元/kg" };
+        return { base: 32, step: 7, label: "首重32元 + 续重7元/500g" };
       }
       if (bracket.id === "10-20") {
-        return { base: 33, step: 7, label: "首重33元 + 续重7元/kg" };
+        return { base: 33, step: 7, label: "首重33元 + 续重7元/500g" };
       }
       return { unavailable: "超过可选重量范围" };
     },
@@ -115,7 +116,7 @@ const carriers = [
     },
     rateFor: ({ bracket }) => {
       if (["0-0.5", "0.5-2.5", "2.5-5", "5-10", "10-20"].includes(bracket.id)) {
-        return { base: 35, step: 5, label: "首重35元 + 续重5元/kg" };
+        return { base: 35, step: 5, label: "首重35元 + 续重5元/500g" };
       }
       return { unavailable: "超过可选重量范围" };
     },
@@ -138,13 +139,13 @@ const carriers = [
     },
     rateFor: ({ bracket }) => {
       if (["0-0.5", "0.5-2.5", "2.5-5"].includes(bracket.id)) {
-        return { base: 33, step: 5, label: "首重33元 + 续重5元/kg" };
+        return { base: 33, step: 5, label: "首重33元 + 续重5元/500g" };
       }
       if (bracket.id === "5-10") {
-        return { base: 34, step: 5.5, label: "首重34元 + 续重5.5元/kg" };
+        return { base: 34, step: 5.5, label: "首重34元 + 续重5.5元/500g" };
       }
       if (bracket.id === "10-20") {
-        return { base: 35, step: 6, label: "首重35元 + 续重6元/kg" };
+        return { base: 35, step: 6, label: "首重35元 + 续重6元/500g" };
       }
       return { unavailable: "超过可选重量范围" };
     },
@@ -154,16 +155,16 @@ const carriers = [
     dimensionalRule: ({ actualWeight }) => ({ mode: "免抛", billableWeight: actualWeight }),
     rateFor: ({ bracket, billableWeight }) => {
       if (["0-0.5", "0.5-2.5"].includes(bracket.id)) {
-        return { base: 33, step: 5, label: "首重33元 + 续重5元/kg" };
+        return { base: 33, step: 5, label: "首重33元 + 续重5元/500g" };
       }
       if (bracket.id === "2.5-5") {
-        return { base: 34, step: 5.5, label: "首重34元 + 续重5.5元/kg" };
+        return { base: 34, step: 5.5, label: "首重34元 + 续重5.5元/500g" };
       }
       if (["5-10", "10-20"].includes(bracket.id)) {
-        return { base: 35, step: 6, label: "首重35元 + 续重6元/kg" };
+        return { base: 35, step: 6, label: "首重35元 + 续重6元/500g" };
       }
       if (bracket.id === "20-30") {
-        return { base: 35, step: 6.5, label: "首重35元 + 续重6.5元/kg" };
+        return { base: 35, step: 6.5, label: "首重35元 + 续重6.5元/500g" };
       }
       return { flatPerKg: 15, label: "15元/kg", chargeWeight: roundUpKg(billableWeight) };
     },
@@ -186,7 +187,7 @@ const carriers = [
     },
     rateFor: ({ bracket }) => {
       if (["0-0.5", "0.5-2.5", "2.5-5", "5-10"].includes(bracket.id)) {
-        return { base: 31, step: 5, label: "首重31元 + 续重5元/kg" };
+        return { base: 31, step: 5, label: "首重31元 + 续重5元/500g" };
       }
       return { unavailable: "超过可选重量范围" };
     },
@@ -320,13 +321,15 @@ function calculateCarrier(carrier, input) {
     : roundCurrency(rate.base + continuationUnits(billableWeight) * rate.step);
 
   const regionFee = carrier.regionFee ? carrier.regionFee({ region: input.region }) : { fee: 0, note: "" };
-  const extraFee = (dimensional.extraFee || 0) + (regionFee.fee || 0);
+  const finalSurcharge = carrier.finalSurcharge || { fee: 0, note: "" };
+  const extraFee = (dimensional.extraFee || 0) + (regionFee.fee || 0) + (finalSurcharge.fee || 0);
   const total = roundCurrency(baseFreight + extraFee);
   const warnings = [];
 
   if (rate.notRecommended) warnings.push(rate.notRecommended);
   if (dimensional.extraNote) warnings.push(dimensional.extraNote);
   if (regionFee.note) warnings.push(regionFee.note);
+  if (finalSurcharge.note) warnings.push(finalSurcharge.note);
   if (input.region === "hokkaido" && !["盘古", "中外运"].includes(carrier.name)) {
     warnings.push("北海道偏远费未提供，按基础价显示");
   }
@@ -375,7 +378,7 @@ function halfThrowWeight(actualWeight, length, width, height) {
 }
 
 function continuationUnits(weight) {
-  return Math.max(0, Math.ceil(weight - 0.5));
+  return Math.max(0, Math.ceil((weight - 0.5) / 0.5));
 }
 
 function roundUpKg(weight) {
@@ -510,3 +513,4 @@ function escapeHtml(value) {
 }
 
 init();
+
