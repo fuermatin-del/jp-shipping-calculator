@@ -53,7 +53,7 @@ const carriers = [
   {
     name: "盛欣",
     dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
-      const smallParcel = length <= 27 && width <= 25 && height <= 5 && actualWeight <= 0.5;
+      const smallParcel = length <= 35 && width <= 27 && height <= 5;
       if (sum < 160) {
         return { mode: "免抛", billableWeight: actualWeight, smallParcel };
       }
@@ -91,7 +91,7 @@ const carriers = [
       if (sum < 260) return { mode: "全抛", billableWeight: fullThrowWeight(actualWeight, length, width, height) };
       return { unavailable: "三边合计达到 260cm 及以上" };
     },
-    rateFor: ({ bracket }) => {
+    rateFor: ({ bracket, billableWeight }) => {
       if (["0-0.5", "0.5-2.5"].includes(bracket.id)) {
         return { base: 31, step: 5, label: "首重31元 + 续重5元/500g" };
       }
@@ -103,6 +103,9 @@ const carriers = [
       }
       if (bracket.id === "10-20") {
         return { base: 33, step: 7, label: "首重33元 + 续重7元/500g" };
+      }
+      if (bracket.id === "20-30") {
+        return { flatPerKg: 20, label: "20元/kg", chargeWeight: roundUpKg(billableWeight) };
       }
       return { unavailable: "超过可选重量范围" };
     },
@@ -370,11 +373,11 @@ function volumeWeight(length, width, height) {
 }
 
 function fullThrowWeight(actualWeight, length, width, height) {
-  return Math.max(actualWeight, volumeWeight(length, width, height));
+  return Math.max(actualWeight, volumeWeight(length, width, height) / 2);
 }
 
 function halfThrowWeight(actualWeight, length, width, height) {
-  return Math.max(actualWeight, (volumeWeight(length, width, height) + actualWeight) / 2);
+  return (volumeWeight(length, width, height) + actualWeight) / 2;
 }
 
 function continuationUnits(weight) {
@@ -513,4 +516,6 @@ function escapeHtml(value) {
 }
 
 init();
+
+
 
