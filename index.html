@@ -1,140 +1,160 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>日本站运费核算</title>
-    <link rel="stylesheet" href="./styles.css">
-  </head>
-  <body>
-    <main class="app-shell">
-      <section class="workspace" aria-labelledby="page-title">
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">Amazon JP Fulfillment</p>
-            <h1 id="page-title">日本站运费核算</h1>
-          </div>
-          <div class="rate-note">人民币 / CM / KG</div>
-        </header>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Amazon Japan 客服邮件模板助手</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <aside class="sidebar" aria-label="模板筛选">
+      <div class="brand">
+        <span class="brand-mark">JP</span>
+        <div>
+          <h1>邮件模板助手</h1>
+          <p>Amazon Japan customer support</p>
+        </div>
+      </div>
 
-        <section class="calculator-grid">
-          <form class="input-panel" id="shipment-form" autocomplete="off">
-            <div class="panel-heading">
-              <h2>包裹信息</h2>
-              <button class="ghost-button" id="reset-button" type="button">清空</button>
+      <label class="field">
+        <span>搜索</span>
+        <input id="searchInput" type="search" placeholder="例：破损、未着、返品、返金">
+      </label>
+
+      <div class="field">
+        <span>场景</span>
+        <div id="categoryFilters" class="chip-grid" role="list"></div>
+      </div>
+
+      <label class="field">
+        <span>语气</span>
+        <select id="toneSelect">
+          <option value="all">全部</option>
+          <option value="standard">标准</option>
+          <option value="apology">郑重道歉</option>
+          <option value="firm">规则说明</option>
+          <option value="warm">温和安抚</option>
+        </select>
+      </label>
+
+      <section class="variables" aria-label="变量填写">
+        <h2>信息填写</h2>
+        <label class="field compact">
+          <span>买家称呼</span>
+          <input data-var="buyerName" type="text" placeholder="例：山田（様自动补）">
+        </label>
+        <label class="field compact">
+          <span>配件/部品名</span>
+          <input data-var="partName" type="text" placeholder="例：ミラーパネル">
+        </label>
+        <label class="field compact">
+          <span>返金金额</span>
+          <input data-var="refundAmount" type="text" placeholder="例：1,000円">
+        </label>
+        <label class="field compact">
+          <span>配送公司</span>
+          <input data-var="carrier" type="text" placeholder="例：佐川急便">
+        </label>
+        <label class="field compact">
+          <span>追踪号</span>
+          <input data-var="trackingNumber" type="text" placeholder="例：問い合わせ番号">
+        </label>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <p id="resultCount" class="count">0 件</p>
+          <h2 id="currentCategory">全部模板</h2>
+        </div>
+        <div class="toolbar">
+          <label class="file-button" title="导入模板文件">
+            <span aria-hidden="true">↥</span>
+            导入
+            <input id="importInput" type="file" accept=".json,application/json">
+          </label>
+          <button id="exportButton" class="ghost-button" type="button">
+            <span aria-hidden="true">↧</span>
+            导出
+          </button>
+          <button id="resetImportButton" class="ghost-button" type="button">重置导入</button>
+          <button id="clearButton" class="icon-button" type="button" title="清空输入" aria-label="清空输入">
+            <span aria-hidden="true">⌫</span>
+          </button>
+          <button id="copyButton" class="primary-button" type="button">
+            <span aria-hidden="true">⧉</span>
+            复制回复
+          </button>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <section class="template-list" aria-label="模板列表">
+          <div id="templateList" class="template-list-inner"></div>
+        </section>
+
+        <section class="reply-panel" aria-label="回复预览">
+          <section class="smart-panel" aria-label="智能匹配">
+            <div class="section-heading">
+              <div>
+                <p class="meta">买家消息</p>
+                <h3>粘贴后自动匹配回复</h3>
+              </div>
+              <button id="analyzeButton" class="primary-button" type="button">
+                <span aria-hidden="true">◎</span>
+                识别匹配
+              </button>
             </div>
 
-            <div class="field-grid">
-              <label class="field">
-                <span>长度</span>
-                <div class="input-unit">
-                  <input id="length" name="length" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0">
-                  <span>cm</span>
-                </div>
-              </label>
-
-              <label class="field">
-                <span>宽度</span>
-                <div class="input-unit">
-                  <input id="width" name="width" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0">
-                  <span>cm</span>
-                </div>
-              </label>
-
-              <label class="field">
-                <span>高度</span>
-                <div class="input-unit">
-                  <input id="height" name="height" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0">
-                  <span>cm</span>
-                </div>
-              </label>
-
-              <label class="field">
-                <span>实际重量</span>
-                <div class="input-unit">
-                  <input id="weight" name="weight" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">
-                  <span>kg</span>
-                </div>
-              </label>
-            </div>
-
-            <label class="field full-field">
-              <span>发往地区</span>
-              <select id="prefecture" name="prefecture"></select>
+            <label class="field">
+              <span>买家原文 / Amazon官方消息</span>
+              <textarea id="buyerMessage" rows="5" placeholder="把买家消息直接粘贴在这里，例如：鏡が割れていました。返品したいです。"></textarea>
             </label>
 
-            <div class="metric-row">
-              <div>
-                <span class="metric-label">三边合计</span>
-                <strong id="dimension-sum">--</strong>
-              </div>
-              <div>
-                <span class="metric-label">体积重</span>
-                <strong id="volume-weight">--</strong>
-              </div>
-              <div>
-                <span class="metric-label">地区类型</span>
-                <strong id="region-kind">普通地区</strong>
-              </div>
+            <div id="matchPanel" class="match-panel">
+              <p>粘贴买家消息后，会根据内置历史话术自动匹配最接近的模板。</p>
             </div>
-          </form>
+          </section>
 
-          <aside class="summary-panel" aria-live="polite">
-            <p class="summary-label">当前推荐</p>
-            <div id="best-card" class="best-card empty">
-              <span>输入包裹规格后自动核算</span>
+          <div class="reply-header">
+            <div>
+              <p id="templateMeta" class="meta">请选择模板</p>
+              <h3 id="templateTitle">日文回复</h3>
             </div>
-          </aside>
-        </section>
-
-        <section class="results-panel">
-          <div class="panel-heading">
-            <h2>快递报价</h2>
-            <div class="legend">
-              <span><i class="dot ok"></i>可选</span>
-              <span><i class="dot warn"></i>不推荐</span>
-              <span><i class="dot off"></i>不可选</span>
-            </div>
+            <button id="variantButton" class="ghost-button" type="button">换一种说法</button>
           </div>
 
-          <div class="desktop-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>快递</th>
-                  <th>状态</th>
-                  <th>重量档</th>
-                  <th>计费重</th>
-                  <th>计费方式</th>
-                  <th>附加费</th>
-                  <th>合计</th>
-                </tr>
-              </thead>
-              <tbody id="results-body">
-                <tr>
-                  <td colspan="7" class="empty-row">等待输入包裹规格</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <label class="field">
+            <span>真人感补充句</span>
+            <select id="humanLineSelect"></select>
+          </label>
 
-          <div class="mobile-results" id="mobile-results"></div>
-        </section>
+          <label class="field">
+            <span>中文补充/调整</span>
+            <textarea id="chineseDraft" rows="3" placeholder="例：告诉买家我们可以安排全额退款，破损商品不需要退回。"></textarea>
+          </label>
 
-        <section class="rules-panel">
-          <h2>计费边界</h2>
-          <div class="rule-list">
-            <span>重量边界按后一档</span>
-            <span>首重按 0.5kg，续重按每 500g/斤向上取整</span>
-            <span>全抛计费重 = 长 × 宽 × 高 ÷ 6000 ÷ 2 后与实重取较大值</span>
-            <span>半抛计费重 = (长 × 宽 × 高 ÷ 6000 + 实重) ÷ 2</span>
+          <label class="field">
+            <span>日文补充/译文</span>
+            <textarea id="customLine" rows="3" placeholder="AI接口接入后，这里会根据中文补充自动生成日文；现在也可以直接输入日文补充。"></textarea>
+          </label>
+
+          <textarea id="replyOutput" class="reply-output" spellcheck="false" aria-label="日文回复输出"></textarea>
+
+          <div class="notes">
+            <h4>确认点</h4>
+            <ul id="checklist"></ul>
           </div>
         </section>
-      </section>
-    </main>
+      </div>
+    </section>
+  </main>
 
-    <script src="./app.js?v=20260615-latest-table"></script>
-  </body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="templates.js"></script>
+  <script src="app.js"></script>
+</body>
 </html>
-
-

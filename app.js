@@ -1,521 +1,675 @@
-﻿const prefectures = [
-  ["ordinary", "普通地区"],
-  ["hokkaido", "北海道"],
-  ["okinawa", "冲绳"],
-  ["ordinary", "青森县"],
-  ["ordinary", "岩手县"],
-  ["ordinary", "宫城县"],
-  ["ordinary", "秋田县"],
-  ["ordinary", "山形县"],
-  ["ordinary", "福岛县"],
-  ["ordinary", "茨城县"],
-  ["ordinary", "栃木县"],
-  ["ordinary", "群马县"],
-  ["ordinary", "埼玉县"],
-  ["ordinary", "千叶县"],
-  ["ordinary", "东京都"],
-  ["ordinary", "神奈川县"],
-  ["ordinary", "新潟县"],
-  ["ordinary", "富山县"],
-  ["ordinary", "石川县"],
-  ["ordinary", "福井县"],
-  ["ordinary", "山梨县"],
-  ["ordinary", "长野县"],
-  ["ordinary", "岐阜县"],
-  ["ordinary", "静冈县"],
-  ["ordinary", "爱知县"],
-  ["ordinary", "三重县"],
-  ["ordinary", "滋贺县"],
-  ["ordinary", "京都府"],
-  ["ordinary", "大阪府"],
-  ["ordinary", "兵库县"],
-  ["ordinary", "奈良县"],
-  ["ordinary", "和歌山县"],
-  ["ordinary", "鸟取县"],
-  ["ordinary", "岛根县"],
-  ["ordinary", "冈山县"],
-  ["ordinary", "广岛县"],
-  ["ordinary", "山口县"],
-  ["ordinary", "德岛县"],
-  ["ordinary", "香川县"],
-  ["ordinary", "爱媛县"],
-  ["ordinary", "高知县"],
-  ["ordinary", "福冈县"],
-  ["ordinary", "佐贺县"],
-  ["ordinary", "长崎县"],
-  ["ordinary", "熊本县"],
-  ["ordinary", "大分县"],
-  ["ordinary", "宫崎县"],
-  ["ordinary", "鹿儿岛县"],
-];
-
-const carriers = [
-  {
-    name: "盛欣",
-    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
-      const smallParcel = length <= 35 && width <= 27 && height <= 5;
-      if (sum < 160) {
-        return { mode: "免抛", billableWeight: actualWeight, smallParcel };
-      }
-      if (sum < 260) {
-        return { mode: "半抛", billableWeight: halfThrowWeight(actualWeight, length, width, height), smallParcel };
-      }
-      return { unavailable: "三边合计达到 260cm 及以上" };
-    },
-    rateFor: ({ bracket, smallParcel }) => {
-      if (smallParcel) {
-        return {
-          base: 28,
-          step: 6,
-          label: "小包首重28元 + 续重6元/500g",
-          bracketOverride: { id: "small-0.5", label: "0-0.5kg小包" },
-        };
-      }
-      if (["0-0.5", "0.5-2.5", "2.5-5"].includes(bracket.id)) {
-        return { base: 35, step: 5, label: "首重35元 + 续重5元/500g" };
-      }
-      if (bracket.id === "5-10") {
-        return { base: 35.5, step: 5.5, label: "首重35.5元 + 续重5.5元/500g" };
-      }
-      if (bracket.id === "10-20") {
-        return { base: 36, step: 6, label: "首重36元 + 续重6元/500g", notRecommended: "10kg以上尽量不选" };
-      }
-      return { unavailable: "超过可选重量范围" };
-    },
-  },
-  {
-    name: "OCS",
-    finalSurcharge: { fee: 1.5, note: "OCS固定附加费 1.5元" },
-    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
-      if (sum < 120) return { mode: "免抛", billableWeight: actualWeight };
-      if (sum < 260) return { mode: "全抛", billableWeight: fullThrowWeight(actualWeight, length, width, height) };
-      return { unavailable: "三边合计达到 260cm 及以上" };
-    },
-    rateFor: ({ bracket, billableWeight }) => {
-      if (["0-0.5", "0.5-2.5"].includes(bracket.id)) {
-        return { base: 31, step: 5, label: "首重31元 + 续重5元/500g" };
-      }
-      if (bracket.id === "2.5-5") {
-        return { base: 31, step: 7, label: "首重31元 + 续重7元/500g" };
-      }
-      if (bracket.id === "5-10") {
-        return { base: 32, step: 7, label: "首重32元 + 续重7元/500g" };
-      }
-      if (bracket.id === "10-20") {
-        return { base: 33, step: 7, label: "首重33元 + 续重7元/500g" };
-      }
-      if (bracket.id === "20-30") {
-        return { flatPerKg: 20, label: "20元/kg", chargeWeight: roundUpKg(billableWeight) };
-      }
-      return { unavailable: "超过可选重量范围" };
-    },
-  },
-  {
-    name: "林道",
-    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
-      if (sum < 160) return { mode: "免抛", billableWeight: actualWeight };
-      if (sum < 260) return { mode: "全抛", billableWeight: fullThrowWeight(actualWeight, length, width, height) };
-      return { unavailable: "三边合计达到 260cm 及以上" };
-    },
-    rateFor: ({ bracket }) => {
-      if (["0-0.5", "0.5-2.5", "2.5-5", "5-10", "10-20"].includes(bracket.id)) {
-        return { base: 35, step: 5, label: "首重35元 + 续重5元/500g" };
-      }
-      return { unavailable: "超过可选重量范围" };
-    },
-  },
-  {
-    name: "盘古",
-    dimensionalRule: ({ sum, maxSide, actualWeight, length, width, height }) => {
-      if (sum >= 260) return { unavailable: "三边合计达到 260cm 及以上" };
-      const oversizedFee = maxSide > 200 ? 60 : maxSide > 100 ? 30 : 0;
-      const oversizedNote = oversizedFee ? `单边超长费 ${oversizedFee}元` : "";
-      if (sum < 140) {
-        return { mode: "免抛", billableWeight: actualWeight, extraFee: oversizedFee, extraNote: oversizedNote };
-      }
-      return {
-        mode: "半抛",
-        billableWeight: halfThrowWeight(actualWeight, length, width, height),
-        extraFee: oversizedFee,
-        extraNote: oversizedNote,
-      };
-    },
-    rateFor: ({ bracket }) => {
-      if (["0-0.5", "0.5-2.5", "2.5-5"].includes(bracket.id)) {
-        return { base: 33, step: 5, label: "首重33元 + 续重5元/500g" };
-      }
-      if (bracket.id === "5-10") {
-        return { base: 34, step: 5.5, label: "首重34元 + 续重5.5元/500g" };
-      }
-      if (bracket.id === "10-20") {
-        return { base: 35, step: 6, label: "首重35元 + 续重6元/500g" };
-      }
-      return { unavailable: "超过可选重量范围" };
-    },
-  },
-  {
-    name: "中外运",
-    dimensionalRule: ({ actualWeight }) => ({ mode: "免抛", billableWeight: actualWeight }),
-    rateFor: ({ bracket, billableWeight }) => {
-      if (["0-0.5", "0.5-2.5"].includes(bracket.id)) {
-        return { base: 33, step: 5, label: "首重33元 + 续重5元/500g" };
-      }
-      if (bracket.id === "2.5-5") {
-        return { base: 34, step: 5.5, label: "首重34元 + 续重5.5元/500g" };
-      }
-      if (["5-10", "10-20"].includes(bracket.id)) {
-        return { base: 35, step: 6, label: "首重35元 + 续重6元/500g" };
-      }
-      if (bracket.id === "20-30") {
-        return { base: 35, step: 6.5, label: "首重35元 + 续重6.5元/500g" };
-      }
-      return { flatPerKg: 15, label: "15元/kg", chargeWeight: roundUpKg(billableWeight) };
-    },
-    regionFee: ({ region }) => {
-      if (region === "okinawa") return { fee: 150, note: "冲绳偏远费 150元" };
-      if (region === "hokkaido") return { fee: 0, note: "北海道不额外收费" };
-      return { fee: 0, note: "" };
-    },
-  },
-  {
-    name: "顺丰",
-    dimensionalRule: ({ sum, maxSide, actualWeight }) => {
-      const oversized = maxSide >= 120 || sum >= 150;
-      return {
-        mode: "免抛",
-        billableWeight: actualWeight,
-        extraFee: oversized ? 108 : 0,
-        extraNote: oversized ? "超出尺寸费 108元" : "",
-      };
-    },
-    rateFor: ({ bracket }) => {
-      if (["0-0.5", "0.5-2.5", "2.5-5", "5-10"].includes(bracket.id)) {
-        return { base: 31, step: 5, label: "首重31元 + 续重5元/500g" };
-      }
-      return { unavailable: "超过可选重量范围" };
-    },
-  },
-];
-
-const elements = {
-  form: document.querySelector("#shipment-form"),
-  reset: document.querySelector("#reset-button"),
-  length: document.querySelector("#length"),
-  width: document.querySelector("#width"),
-  height: document.querySelector("#height"),
-  weight: document.querySelector("#weight"),
-  prefecture: document.querySelector("#prefecture"),
-  dimensionSum: document.querySelector("#dimension-sum"),
-  volumeWeight: document.querySelector("#volume-weight"),
-  regionKind: document.querySelector("#region-kind"),
-  bestCard: document.querySelector("#best-card"),
-  resultsBody: document.querySelector("#results-body"),
-  mobileResults: document.querySelector("#mobile-results"),
-};
-
-function init() {
-  populatePrefectures();
-  elements.form.addEventListener("input", calculateAndRender);
-  elements.prefecture.addEventListener("change", calculateAndRender);
-  elements.reset.addEventListener("click", resetForm);
-  calculateAndRender();
-}
-
-function populatePrefectures() {
-  elements.prefecture.innerHTML = prefectures
-    .map(([region, label]) => `<option value="${region}|${label}">${label}</option>`)
-    .join("");
-}
-
-function resetForm() {
-  elements.length.value = "";
-  elements.width.value = "";
-  elements.height.value = "";
-  elements.weight.value = "";
-  elements.prefecture.selectedIndex = 0;
-  calculateAndRender();
-}
-
-function calculateAndRender() {
-  const input = getInput();
-  updateMetrics(input);
-
-  if (!input.valid) {
-    renderEmpty();
-    return;
-  }
-
-  const rows = carriers.map((carrier) => calculateCarrier(carrier, input));
-  const recommended = chooseRecommended(rows);
-  const sortedRows = sortRows(rows, recommended);
-  renderBest(recommended, rows);
-  renderTable(sortedRows, recommended);
-  renderCards(sortedRows, recommended);
-}
-
-function getInput() {
-  const length = parsePositive(elements.length.value);
-  const width = parsePositive(elements.width.value);
-  const height = parsePositive(elements.height.value);
-  const weight = parsePositive(elements.weight.value);
-  const [region, label] = elements.prefecture.value.split("|");
-
-  return {
-    length,
-    width,
-    height,
-    actualWeight: weight,
-    region,
-    regionLabel: label || "普通地区",
-    valid: [length, width, height, weight].every((value) => Number.isFinite(value) && value > 0),
-  };
-}
-
-function parsePositive(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : NaN;
-}
-
-function updateMetrics(input) {
-  if (!input.valid) {
-    elements.dimensionSum.textContent = "--";
-    elements.volumeWeight.textContent = "--";
-  } else {
-    elements.dimensionSum.textContent = `${formatNumber(input.length + input.width + input.height)} cm`;
-    elements.volumeWeight.textContent = `${formatNumber(volumeWeight(input.length, input.width, input.height))} kg`;
-  }
-  elements.regionKind.textContent = regionName(input.region);
-}
-
-function calculateCarrier(carrier, input) {
-  const dimensions = {
-    length: input.length,
-    width: input.width,
-    height: input.height,
-    actualWeight: input.actualWeight,
-    sum: input.length + input.width + input.height,
-    maxSide: Math.max(input.length, input.width, input.height),
+(function () {
+  const builtInTemplates = (window.MAIL_TEMPLATE_DATA || []).filter(isVisibleTemplate);
+  const storageKey = "amazonJpMailTemplates.custom.v2";
+  let customTemplates = loadCustomTemplates();
+  let templates = mergeTemplates(builtInTemplates, customTemplates);
+  const state = {
+    category: "all",
+    tone: "all",
+    search: "",
+    selectedId: templates[0]?.id || null,
+    variantIndex: 0,
+    variables: {},
+    matchResult: null,
+    autoTimer: null
   };
 
-  const dimensional = carrier.dimensionalRule(dimensions);
-  if (dimensional.unavailable) {
-    return unavailableRow(carrier.name, dimensional.unavailable);
+  const elements = {
+    searchInput: document.querySelector("#searchInput"),
+    categoryFilters: document.querySelector("#categoryFilters"),
+    toneSelect: document.querySelector("#toneSelect"),
+    templateList: document.querySelector("#templateList"),
+    resultCount: document.querySelector("#resultCount"),
+    currentCategory: document.querySelector("#currentCategory"),
+    templateMeta: document.querySelector("#templateMeta"),
+    templateTitle: document.querySelector("#templateTitle"),
+    variantButton: document.querySelector("#variantButton"),
+    buyerMessage: document.querySelector("#buyerMessage"),
+    analyzeButton: document.querySelector("#analyzeButton"),
+    matchPanel: document.querySelector("#matchPanel"),
+    humanLineSelect: document.querySelector("#humanLineSelect"),
+    chineseDraft: document.querySelector("#chineseDraft"),
+    customLine: document.querySelector("#customLine"),
+    replyOutput: document.querySelector("#replyOutput"),
+    checklist: document.querySelector("#checklist"),
+    copyButton: document.querySelector("#copyButton"),
+    importInput: document.querySelector("#importInput"),
+    exportButton: document.querySelector("#exportButton"),
+    resetImportButton: document.querySelector("#resetImportButton"),
+    clearButton: document.querySelector("#clearButton"),
+    toast: document.querySelector("#toast"),
+    variableInputs: Array.from(document.querySelectorAll("[data-var]"))
+  };
+
+  const toneLabels = {
+    standard: "标准",
+    apology: "郑重道歉",
+    firm: "规则说明",
+    warm: "温和安抚"
+  };
+
+  const fallbackValues = {
+    buyerName: "お客様",
+    productName: "ご注文商品",
+    orderId: "ご注文番号",
+    date: "確認後",
+    action: "状況に応じた対応",
+    partName: "該当部品",
+    refundAmount: "返金額",
+    carrier: "配送業者",
+    trackingNumber: "",
+    returnAddress: "返品先住所"
+  };
+
+  const smartRules = [
+    {
+      label: "商品破损/不良",
+      categories: ["商品不良", "规格差异"],
+      keywords: ["破損", "割れ", "割れて", "ヒビ", "亀裂", "壊れ", "不良", "傷", "凹み", "歪み", "錆", "塗装", "破损", "坏", "裂", "碎"]
+    },
+    {
+      label: "返品返金",
+      categories: ["返品返金", "返金通知"],
+      keywords: ["返品", "返金", "全額返金", "返品したい", "返金して", "キャンセル", "着払い", "送料", "退款", "退货", "退回", "到付"]
+    },
+    {
+      label: "配送异常",
+      categories: ["配送"],
+      keywords: ["届かない", "未着", "配達", "配送", "発送", "追跡", "追跡番号", "不在", "保管", "住所", "受取", "返送", "没收到", "物流", "快递"]
+    },
+    {
+      label: "部品/补发",
+      categories: ["補修部品", "部品不足"],
+      keywords: ["部品", "パーツ", "ネジ", "板", "パネル", "キャスター", "不足", "入っていない", "再発送", "送って", "缺件", "配件", "补发"]
+    },
+    {
+      label: "使用方法",
+      categories: ["使用方法"],
+      keywords: ["説明書", "組み立て", "組立", "取り付け", "使い方", "方法", "安装", "说明书", "组装"]
+    },
+    {
+      label: "评价合规",
+      categories: ["评价合规", "不满安抚"],
+      keywords: ["レビュー", "評価", "星", "悪い評価", "低評価", "差评", "评价"]
+    },
+    {
+      label: "申诉/A-to-z",
+      categories: ["不满安抚", "返品返金"],
+      keywords: ["A-to-z", "クレーム", "保証申請", "Amazon介入", "申诉", "索赔"]
+    }
+  ];
+
+  function isVisibleTemplate(template) {
+    return template && String(template.category || "").trim().toLowerCase() !== "english";
   }
 
-  const billableWeight = Math.max(input.actualWeight, dimensional.billableWeight);
-  const bracket = getWeightBracket(billableWeight);
-  const rate = carrier.rateFor({
-    bracket,
-    billableWeight,
-    smallParcel: dimensional.smallParcel,
-  });
-  const displayBracket = rate.bracketOverride || bracket;
+  function loadCustomTemplates() {
+    try {
+      const saved = window.localStorage.getItem(storageKey);
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed.filter(isVisibleTemplate) : [];
+    } catch (error) {
+      return [];
+    }
+  }
 
-  if (rate.unavailable) {
-    return unavailableRow(carrier.name, rate.unavailable, {
-      bracket: displayBracket,
-      billableWeight,
-      method: dimensional.mode,
+  function saveCustomTemplates() {
+    window.localStorage.setItem(storageKey, JSON.stringify(customTemplates));
+  }
+
+  function mergeTemplates(baseTemplates, extraTemplates) {
+    const byId = new Map();
+    [...baseTemplates, ...extraTemplates].filter(isVisibleTemplate).forEach((template) => {
+      if (template && template.id) {
+        byId.set(template.id, template);
+      }
+    });
+    return Array.from(byId.values());
+  }
+
+  function asTextArray(value) {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+
+  function normalizeTemplate(template, index) {
+    const title = String(template.title || "").trim();
+    const category = String(template.category || "").trim();
+    const variants = asTextArray(template.variants);
+    if (!title || !category || !variants.length) {
+      throw new Error(`第 ${index + 1} 条模板缺少 title、category 或 variants`);
+    }
+
+    const id = String(template.id || `${category}-${title}-${index + 1}`)
+      .trim()
+      .replace(/\s+/g, "-");
+
+    return {
+      id,
+      category,
+      tone: toneLabels[template.tone] ? template.tone : "standard",
+      title,
+      summary: String(template.summary || "导入模板").trim(),
+      keywords: asTextArray(template.keywords),
+      checklist: asTextArray(template.checklist),
+      humanLines: asTextArray(template.humanLines),
+      variants
+    };
+  }
+
+  function extractTemplatesFromJson(json) {
+    const rawTemplates = Array.isArray(json) ? json : json.templates;
+    if (!Array.isArray(rawTemplates)) {
+      throw new Error("模板文件需要是数组，或包含 templates 数组");
+    }
+    return rawTemplates.map(normalizeTemplate).filter(isVisibleTemplate);
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function uniqueCategories() {
+    return ["all", ...new Set(templates.map((template) => template.category))];
+  }
+
+  function normalize(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function getSelectedTemplate() {
+    return templates.find((template) => template.id === state.selectedId) || templates[0];
+  }
+
+  function formatBuyerName(value) {
+    const name = String(value || "").trim();
+    if (!name) {
+      return fallbackValues.buyerName;
+    }
+    if (/様$|さま$|さん$|殿$/.test(name)) {
+      return name;
+    }
+    return `${name}様`;
+  }
+
+  function getFilteredTemplates() {
+    const query = normalize(state.search);
+    return templates.filter((template) => {
+      const matchesCategory = state.category === "all" || template.category === state.category;
+      const matchesTone = state.tone === "all" || template.tone === state.tone;
+      const haystack = [
+        template.title,
+        template.summary,
+        template.category,
+        template.tone,
+        ...(template.keywords || []),
+        ...(template.humanLines || []),
+        ...(template.variants || [])
+      ].join(" ").toLowerCase();
+      return matchesCategory && matchesTone && (!query || haystack.includes(query));
     });
   }
 
-  const baseFreight = rate.flatPerKg
-    ? roundCurrency(rate.chargeWeight * rate.flatPerKg)
-    : roundCurrency(rate.base + continuationUnits(billableWeight) * rate.step);
-
-  const regionFee = carrier.regionFee ? carrier.regionFee({ region: input.region }) : { fee: 0, note: "" };
-  const finalSurcharge = carrier.finalSurcharge || { fee: 0, note: "" };
-  const extraFee = (dimensional.extraFee || 0) + (regionFee.fee || 0) + (finalSurcharge.fee || 0);
-  const total = roundCurrency(baseFreight + extraFee);
-  const warnings = [];
-
-  if (rate.notRecommended) warnings.push(rate.notRecommended);
-  if (dimensional.extraNote) warnings.push(dimensional.extraNote);
-  if (regionFee.note) warnings.push(regionFee.note);
-  if (finalSurcharge.note) warnings.push(finalSurcharge.note);
-  if (input.region === "hokkaido" && !["盘古", "中外运"].includes(carrier.name)) {
-    warnings.push("北海道偏远费未提供，按基础价显示");
+  function countHits(message, keywords) {
+    const normalizedMessage = normalize(message);
+    return keywords.filter((keyword) => normalizedMessage.includes(normalize(keyword)));
   }
 
-  const needsReview = input.region === "hokkaido" && !["盘古", "中外运"].includes(carrier.name);
-  const status = rate.notRecommended || needsReview ? "warn" : "ok";
-
-  return {
-    carrier: carrier.name,
-    status,
-    statusText: rate.notRecommended ? "不推荐" : needsReview ? "需确认" : "可选",
-    bracket: displayBracket,
-    billableWeight,
-    method: dimensional.mode,
-    rateLabel: rate.label,
-    baseFreight,
-    extraFee,
-    total,
-    warnings,
-    available: true,
-  };
-}
-
-function unavailableRow(carrier, reason, partial = {}) {
-  return {
-    carrier,
-    status: "off",
-    statusText: "不可选",
-    reason,
-    available: false,
-    warnings: [reason],
-    ...partial,
-  };
-}
-
-function volumeWeight(length, width, height) {
-  return (length * width * height) / 6000;
-}
-
-function fullThrowWeight(actualWeight, length, width, height) {
-  return Math.max(actualWeight, volumeWeight(length, width, height) / 2);
-}
-
-function halfThrowWeight(actualWeight, length, width, height) {
-  return (volumeWeight(length, width, height) + actualWeight) / 2;
-}
-
-function continuationUnits(weight) {
-  return Math.max(0, Math.ceil((weight - 0.5) / 0.5));
-}
-
-function roundUpKg(weight) {
-  return Math.ceil(weight);
-}
-
-function getWeightBracket(weight) {
-  if (weight < 0.5) return { id: "0-0.5", label: "0-0.5kg" };
-  if (weight < 2.5) return { id: "0.5-2.5", label: "0.5-2.5kg" };
-  if (weight < 5) return { id: "2.5-5", label: "2.5-5kg" };
-  if (weight < 10) return { id: "5-10", label: "5-10kg" };
-  if (weight < 20) return { id: "10-20", label: "10-20kg" };
-  if (weight < 30) return { id: "20-30", label: "20-30kg" };
-  return { id: "30+", label: "30kg以上" };
-}
-
-function chooseRecommended(rows) {
-  const regular = rows.filter((row) => row.available && row.status === "ok");
-  const fallback = rows.filter((row) => row.available);
-  const candidates = regular.length ? regular : fallback;
-  return candidates.reduce((best, row) => (!best || row.total < best.total ? row : best), null);
-}
-
-function sortRows(rows, recommended) {
-  return [...rows].sort((a, b) => {
-    if (recommended) {
-      if (a.carrier === recommended.carrier) return -1;
-      if (b.carrier === recommended.carrier) return 1;
+  function getRiskNotice(message) {
+    const risks = [];
+    if (countHits(message, ["レビュー", "評価", "星", "差评", "评价"]).length) {
+      risks.push("评价相关：不要要求买家删除、撤销或修改评价，也不要用返金/补发交换评价。");
     }
-    if (a.available !== b.available) return a.available ? -1 : 1;
-    if (a.available && b.available) return a.total - b.total;
-    return a.carrier.localeCompare(b.carrier, "zh-CN");
-  });
-}
-
-function renderEmpty() {
-  elements.bestCard.className = "best-card empty";
-  elements.bestCard.innerHTML = "<span>输入包裹规格后自动核算</span>";
-  elements.resultsBody.innerHTML = '<tr><td colspan="7" class="empty-row">等待输入包裹规格</td></tr>';
-  elements.mobileResults.innerHTML = "";
-}
-
-function renderBest(recommended, rows) {
-  if (!recommended) {
-    elements.bestCard.className = "best-card empty";
-    elements.bestCard.innerHTML = "<span>当前规格没有可选快递</span>";
-    return;
+    if (countHits(message, ["A-to-z", "クレーム", "保証申請", "申诉", "索赔"]).length) {
+      risks.push("A-to-z/申诉相关：只按平台状态说明，不要要求买家撤销申诉作为处理条件。");
+    }
+    if (countHits(message, ["銀行", "口座", "银行卡", "银行账号"]).length) {
+      risks.push("银行账号相关：不要接收或使用私人银行账号，返金应走 Amazon 原订单/原支付方式。");
+    }
+    if (countHits(message, ["電話", "住所", "邮箱", "メール", "地址", "手机号"]).length) {
+      risks.push("个人信息相关：按 Amazon 站内规则处理，不主动索要站外联系方式。");
+    }
+    return risks;
   }
 
-  const availableCount = rows.filter((row) => row.available).length;
-  const warning = recommended.status === "warn" ? "，但该渠道标注不推荐" : "";
-  elements.bestCard.className = "best-card";
-  elements.bestCard.innerHTML = `
-    <div class="carrier">${recommended.carrier}</div>
-    <div class="price">${formatCurrency(recommended.total)}</div>
-    <div class="subline">${recommended.method}，计费重 ${formatNumber(recommended.billableWeight)}kg。共 ${availableCount} 个可选报价${warning}。</div>
-  `;
-}
+  function scoreTemplate(template, message) {
+    const templateText = normalize([
+      template.category,
+      template.title,
+      template.summary,
+      ...(template.keywords || []),
+      ...(template.checklist || [])
+    ].join(" "));
+    let score = 0;
+    const matched = new Set();
 
-function renderTable(rows, recommended) {
-  elements.resultsBody.innerHTML = rows.map((row) => `
-    <tr class="${recommended && row.carrier === recommended.carrier ? "best-row" : ""}">
-      <td class="carrier-cell">${row.carrier}</td>
-      <td>${statusBadge(row)}${notesMarkup(row)}</td>
-      <td>${row.bracket ? row.bracket.label : "--"}</td>
-      <td>${row.billableWeight ? `${formatNumber(row.billableWeight)} kg` : "--"}${row.method ? `<div class="muted">${row.method}</div>` : ""}</td>
-      <td>${row.rateLabel || "--"}</td>
-      <td>${row.available ? formatCurrency(row.extraFee || 0) : "--"}</td>
-      <td class="price-cell">${row.available ? formatCurrency(row.total) : "--"}</td>
-    </tr>
-  `).join("");
-}
+    (template.keywords || []).forEach((keyword) => {
+      if (normalize(message).includes(normalize(keyword))) {
+        score += 24;
+        matched.add(keyword);
+      }
+    });
 
-function renderCards(rows, recommended) {
-  elements.mobileResults.innerHTML = rows.map((row) => `
-    <article class="result-card ${recommended && row.carrier === recommended.carrier ? "best-card-row" : ""}">
-      <div class="card-head">
-        <div>
-          <div class="card-name">${row.carrier}</div>
-          ${statusBadge(row)}
+    smartRules.forEach((rule) => {
+      const hits = countHits(message, rule.keywords);
+      if (!hits.length) {
+        return;
+      }
+      hits.slice(0, 6).forEach((hit) => matched.add(hit));
+      if (rule.categories.includes(template.category)) {
+        score += 18 * hits.length;
+      }
+      if (rule.categories.some((category) => templateText.includes(normalize(category)))) {
+        score += 8 * hits.length;
+      }
+      if (templateText.includes(normalize(rule.label))) {
+        score += 6 * hits.length;
+      }
+    });
+
+    if (templateText.includes("写真") && countHits(message, ["写真", "画像", "添付", "撮影"]).length) {
+      score += 18;
+      matched.add("写真");
+    }
+    if (templateText.includes("着払い") && countHits(message, ["着払い", "送料", "集荷"]).length) {
+      score += 20;
+      matched.add("着払い");
+    }
+
+    return { score, matchedKeywords: Array.from(matched).slice(0, 8) };
+  }
+
+  function findBestTemplate(message) {
+    const scored = templates
+      .map((template) => ({ template, ...scoreTemplate(template, message) }))
+      .sort((a, b) => b.score - a.score);
+    const best = scored[0];
+    if (!best || best.score <= 0) {
+      return null;
+    }
+    return {
+      ...best,
+      confidence: best.score >= 70 ? "高" : best.score >= 35 ? "中" : "低",
+      risks: getRiskNotice(message)
+    };
+  }
+
+  function renderMatchPanel() {
+    if (!elements.matchPanel) {
+      return;
+    }
+    const result = state.matchResult;
+    const message = elements.buyerMessage?.value.trim() || "";
+    if (!message) {
+      elements.matchPanel.innerHTML = "<p>粘贴买家消息后，会根据内置历史话术自动匹配最接近的模板。</p>";
+      return;
+    }
+    if (!result) {
+      elements.matchPanel.innerHTML = "<p>暂未匹配到明显场景。可以继续手动搜索模板，或补充更多买家消息。</p>";
+      return;
+    }
+    const keywordHtml = result.matchedKeywords.length
+      ? `<div class="match-tags">${result.matchedKeywords.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("")}</div>`
+      : "";
+    const riskHtml = result.risks.length
+      ? `<p class="risk-text">${escapeHtml(result.risks.join(" "))}</p>`
+      : "<p>未发现明显高风险关键词，发送前仍请按订单实际情况确认。</p>";
+    elements.matchPanel.innerHTML = `
+      <p><strong>匹配模板：</strong>${escapeHtml(result.template.title)}</p>
+      <p><strong>识别场景：</strong>${escapeHtml(result.template.category)} · 匹配度 ${escapeHtml(result.confidence)}</p>
+      ${keywordHtml}
+      ${riskHtml}
+    `;
+  }
+
+  function analyzeBuyerMessage(showNotice = true) {
+    const message = elements.buyerMessage.value.trim();
+    if (!message) {
+      state.matchResult = null;
+      renderMatchPanel();
+      if (showNotice) {
+        showToast("请先粘贴买家消息");
+      }
+      return;
+    }
+    const result = findBestTemplate(message);
+    state.matchResult = result;
+    if (result) {
+      state.category = "all";
+      state.tone = "all";
+      state.search = "";
+      state.selectedId = result.template.id;
+      state.variantIndex = 0;
+      elements.searchInput.value = "";
+      elements.toneSelect.value = "all";
+      render();
+      if (showNotice) {
+        showToast("已匹配最接近模板");
+      }
+      return;
+    }
+    renderMatchPanel();
+    if (showNotice) {
+      showToast("未找到明显匹配");
+    }
+  }
+
+  function replaceVariables(text) {
+    return text.replace(/【(\w+)】/g, (_, key) => {
+      const rawValue = state.variables[key] || fallbackValues[key] || "";
+      const value = key === "buyerName" ? formatBuyerName(rawValue) : rawValue;
+      return value ? value : "";
+    });
+  }
+
+  function cleanReply(text) {
+    return text
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]+\n/g, "\n")
+      .trim();
+  }
+
+  function buildReply() {
+    const template = getSelectedTemplate();
+    if (!template) {
+      return "";
+    }
+
+    const variant = template.variants[state.variantIndex % template.variants.length] || "";
+    const humanLine = elements.humanLineSelect.value || "";
+    const customLine = elements.customLine.value.trim();
+    const insertion = [humanLine, customLine].filter(Boolean).join("\n");
+    const body = replaceVariables(variant);
+
+    if (!insertion) {
+      return cleanReply(body);
+    }
+
+    const parts = body.split("\n\n");
+    parts.splice(Math.min(2, parts.length), 0, insertion);
+    return cleanReply(parts.join("\n\n"));
+  }
+
+  function renderCategories() {
+    elements.categoryFilters.innerHTML = "";
+    uniqueCategories().forEach((category) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `chip${state.category === category ? " active" : ""}`;
+      button.textContent = category === "all" ? "全部" : category;
+      button.addEventListener("click", () => {
+        state.category = category;
+        const filtered = getFilteredTemplates();
+        state.selectedId = filtered[0]?.id || null;
+        state.variantIndex = 0;
+        state.matchResult = null;
+        render();
+      });
+      elements.categoryFilters.appendChild(button);
+    });
+  }
+
+  function renderTemplateList() {
+    const filtered = getFilteredTemplates();
+    elements.resultCount.textContent = `${filtered.length} 件`;
+    elements.currentCategory.textContent = state.category === "all" ? "全部模板" : `${state.category}模板`;
+    elements.templateList.innerHTML = "";
+
+    if (!filtered.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "没有匹配的模板";
+      elements.templateList.appendChild(empty);
+      return;
+    }
+
+    if (!filtered.some((template) => template.id === state.selectedId)) {
+      state.selectedId = filtered[0].id;
+      state.variantIndex = 0;
+    }
+
+    filtered.forEach((template) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `template-card${template.id === state.selectedId ? " active" : ""}`;
+      button.innerHTML = `
+        <div class="tag-row">
+          <span class="tag">${escapeHtml(template.category)}</span>
+          <span class="tag">${escapeHtml(toneLabels[template.tone] || template.tone)}</span>
         </div>
-        <div class="card-price">${row.available ? formatCurrency(row.total) : "--"}</div>
-      </div>
-      <div class="card-line"><span>重量档</span><strong>${row.bracket ? row.bracket.label : "--"}</strong></div>
-      <div class="card-line"><span>计费重</span><strong>${row.billableWeight ? `${formatNumber(row.billableWeight)} kg` : "--"}</strong></div>
-      <div class="card-line"><span>计费方式</span><strong>${row.rateLabel || "--"}</strong></div>
-      <div class="card-line"><span>附加费</span><strong>${row.available ? formatCurrency(row.extraFee || 0) : "--"}</strong></div>
-      ${row.warnings.length ? `<div class="card-line"><span>备注</span><strong>${escapeHtml(row.warnings.join("；"))}</strong></div>` : ""}
-    </article>
-  `).join("");
-}
+        <h3>${escapeHtml(template.title)}</h3>
+        <p>${escapeHtml(template.summary)}</p>
+      `;
+      button.addEventListener("click", () => {
+        state.selectedId = template.id;
+        state.variantIndex = 0;
+        state.matchResult = null;
+        render();
+      });
+      elements.templateList.appendChild(button);
+    });
+  }
 
-function statusBadge(row) {
-  return `<span class="badge ${row.status}">${row.statusText}</span>`;
-}
+  function renderReplyPanel() {
+    const template = getSelectedTemplate();
+    if (!template) {
+      elements.templateMeta.textContent = "没有可用模板";
+      elements.templateTitle.textContent = "回复预览";
+      elements.replyOutput.value = "";
+      elements.checklist.innerHTML = "";
+      return;
+    }
 
-function notesMarkup(row) {
-  if (!row.warnings.length) return "";
-  return `<div class="muted">${escapeHtml(row.warnings.join("；"))}</div>`;
-}
+    elements.templateMeta.textContent = `${template.category} · ${toneLabels[template.tone] || template.tone}`;
+    elements.templateTitle.textContent = template.title;
 
-function formatCurrency(value) {
-  return `¥${formatNumber(value)}`;
-}
+    const previousHumanLine = elements.humanLineSelect.value;
+    elements.humanLineSelect.innerHTML = "";
+    const blankOption = document.createElement("option");
+    blankOption.value = "";
+    blankOption.textContent = "不添加";
+    elements.humanLineSelect.appendChild(blankOption);
+    template.humanLines.forEach((line) => {
+      const option = document.createElement("option");
+      option.value = line;
+      option.textContent = line;
+      elements.humanLineSelect.appendChild(option);
+    });
+    elements.humanLineSelect.value = template.humanLines.includes(previousHumanLine)
+      ? previousHumanLine
+      : template.humanLines[0] || "";
 
-function formatNumber(value) {
-  if (!Number.isFinite(value)) return "--";
-  const rounded = Math.round(value * 100) / 100;
-  return rounded.toLocaleString("zh-CN", {
-    minimumFractionDigits: Number.isInteger(rounded) ? 0 : 2,
-    maximumFractionDigits: 2,
+    elements.replyOutput.value = buildReply();
+    elements.checklist.innerHTML = "";
+    template.checklist.forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = item;
+      elements.checklist.appendChild(li);
+    });
+  }
+
+  function render() {
+    renderCategories();
+    renderTemplateList();
+    renderReplyPanel();
+    renderMatchPanel();
+  }
+
+  function showToast(message) {
+    elements.toast.textContent = message;
+    elements.toast.classList.add("show");
+    window.setTimeout(() => elements.toast.classList.remove("show"), 1800);
+  }
+
+  elements.searchInput.addEventListener("input", (event) => {
+    state.search = event.target.value;
+    const filtered = getFilteredTemplates();
+    state.selectedId = filtered[0]?.id || null;
+    state.variantIndex = 0;
+    state.matchResult = null;
+    render();
   });
-}
 
-function roundCurrency(value) {
-  return Math.round(value * 100) / 100;
-}
+  elements.toneSelect.addEventListener("change", (event) => {
+    state.tone = event.target.value;
+    const filtered = getFilteredTemplates();
+    state.selectedId = filtered[0]?.id || null;
+    state.variantIndex = 0;
+    state.matchResult = null;
+    render();
+  });
 
-function regionName(region) {
-  if (region === "hokkaido") return "北海道";
-  if (region === "okinawa") return "冲绳";
-  return "普通地区";
-}
+  elements.analyzeButton.addEventListener("click", () => {
+    analyzeBuyerMessage(true);
+  });
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+  elements.buyerMessage.addEventListener("input", () => {
+    window.clearTimeout(state.autoTimer);
+    state.autoTimer = window.setTimeout(() => {
+      if (elements.buyerMessage.value.trim().length >= 6) {
+        analyzeBuyerMessage(false);
+      } else {
+        state.matchResult = null;
+        renderMatchPanel();
+      }
+    }, 450);
+  });
 
-init();
+  elements.variableInputs.forEach((input) => {
+    input.addEventListener("input", () => {
+      state.variables[input.dataset.var] = input.value.trim();
+      elements.replyOutput.value = buildReply();
+    });
+  });
 
+  elements.humanLineSelect.addEventListener("change", () => {
+    elements.replyOutput.value = buildReply();
+  });
 
+  elements.customLine.addEventListener("input", () => {
+    elements.replyOutput.value = buildReply();
+  });
 
+  elements.chineseDraft.addEventListener("input", () => {
+    elements.customLine.placeholder = elements.chineseDraft.value.trim()
+      ? "AI接口接入后会自动生成日文译文；当前请在这里手动输入要插入的日文补充。"
+      : "AI接口接入后，这里会根据中文补充自动生成日文；现在也可以直接输入日文补充。";
+  });
+
+  elements.variantButton.addEventListener("click", () => {
+    const template = getSelectedTemplate();
+    if (!template) {
+      return;
+    }
+    state.variantIndex = (state.variantIndex + 1) % template.variants.length;
+    elements.replyOutput.value = buildReply();
+    showToast("已切换表达");
+  });
+
+  elements.copyButton.addEventListener("click", async () => {
+    elements.replyOutput.select();
+    try {
+      await navigator.clipboard.writeText(elements.replyOutput.value);
+      showToast("已复制");
+    } catch (error) {
+      document.execCommand("copy");
+      showToast("已复制");
+    }
+  });
+
+  elements.importInput.addEventListener("change", async (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const importedTemplates = extractTemplatesFromJson(JSON.parse(text));
+      const importedIds = new Set(importedTemplates.map((template) => template.id));
+      customTemplates = [
+        ...customTemplates.filter((template) => !importedIds.has(template.id)),
+        ...importedTemplates
+      ];
+      saveCustomTemplates();
+      templates = mergeTemplates(builtInTemplates, customTemplates);
+      state.category = "all";
+      state.tone = "all";
+      state.search = "";
+      state.selectedId = importedTemplates[0]?.id || templates[0]?.id || null;
+      state.variantIndex = 0;
+      state.matchResult = null;
+      elements.searchInput.value = "";
+      elements.toneSelect.value = "all";
+      render();
+      showToast(`已导入 ${importedTemplates.length} 条模板`);
+    } catch (error) {
+      showToast(error.message || "导入失败");
+    } finally {
+      event.target.value = "";
+    }
+  });
+
+  elements.exportButton.addEventListener("click", () => {
+    const payload = {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      templates
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "amazon-jp-mail-templates.json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast("已导出模板文件");
+  });
+
+  elements.resetImportButton.addEventListener("click", () => {
+    customTemplates = [];
+    window.localStorage.removeItem(storageKey);
+    templates = mergeTemplates(builtInTemplates, customTemplates);
+    state.category = "all";
+    state.tone = "all";
+    state.search = "";
+    state.selectedId = templates[0]?.id || null;
+    state.variantIndex = 0;
+    state.matchResult = null;
+    elements.searchInput.value = "";
+    elements.toneSelect.value = "all";
+    render();
+    showToast("已恢复内置模板");
+  });
+
+  elements.clearButton.addEventListener("click", () => {
+    elements.searchInput.value = "";
+    elements.toneSelect.value = "all";
+    elements.customLine.value = "";
+    elements.chineseDraft.value = "";
+    elements.buyerMessage.value = "";
+    elements.variableInputs.forEach((input) => {
+      input.value = "";
+    });
+    state.search = "";
+    state.tone = "all";
+    state.category = "all";
+    state.variantIndex = 0;
+    state.variables = {};
+    state.selectedId = templates[0]?.id || null;
+    state.matchResult = null;
+    render();
+    showToast("已清空");
+  });
+
+  render();
+})();
