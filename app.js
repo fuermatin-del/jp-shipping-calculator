@@ -1,4 +1,4 @@
-﻿const prefectures = [
+const prefectures = [
   ["ordinary", "普通地区"],
   ["hokkaido", "北海道"],
   ["okinawa", "冲绳"],
@@ -49,150 +49,378 @@
   ["ordinary", "鹿儿岛县"],
 ];
 
-const carriers = [
+const BOUNDARY_TO_NEXT_TIER = new Set([0.5, 2.5, 5, 10]);
+
+const channelRules = [
   {
-    name: "盛欣",
+    id: "shengxin-sagawa",
+    carrier: "盛欣",
+    channel: "3661佐川普货渠道",
+    participates: true,
     dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
-      const smallParcel = length <= 35 && width <= 27 && height <= 5;
       if (sum < 160) {
-        return { mode: "免抛", billableWeight: actualWeight, smallParcel };
+        return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 160cm，免抛`]);
       }
       if (sum < 260) {
-        return { mode: "半抛", billableWeight: halfThrowWeight(actualWeight, length, width, height), smallParcel };
+        const billableWeight = halfThrowWeight(actualWeight, length, width, height, 6000);
+        return dimensionalResult("半抛", billableWeight, [
+          `三边合 ${formatNumber(sum)}cm 进入160-260cm半抛`,
+          `半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`,
+        ]);
       }
-      return { unavailable: "三边合计达到 260cm 及以上" };
+      return unavailableDimensional("三边合达到260cm及以上，盛欣普货不可选");
     },
-    rateFor: ({ bracket, smallParcel }) => {
-      if (smallParcel) {
-        return {
-          base: 28,
-          step: 6,
-          label: "小包首重28元 + 续重6元/500g",
-          bracketOverride: { id: "small-0.5", label: "0-0.5kg小包" },
-        };
-      }
-      if (["0-0.5", "0.5-2.5", "2.5-5"].includes(bracket.id)) {
-        return { base: 35, step: 5, label: "首重35元 + 续重5元/500g" };
-      }
-      if (bracket.id === "5-10") {
-        return { base: 35.5, step: 5.5, label: "首重35.5元 + 续重5.5元/500g" };
-      }
-      if (bracket.id === "10-20") {
-        return { base: 36, step: 6, label: "首重36元 + 续重6元/500g", notRecommended: "10kg以上尽量不选" };
-      }
-      return { unavailable: "超过可选重量范围" };
-    },
-  },
-  {
-    name: "OCS",
-    finalSurcharge: { fee: 1.5, note: "OCS固定附加费 1.5元" },
-    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
-      if (sum < 120) return { mode: "免抛", billableWeight: actualWeight };
-      if (sum < 260) return { mode: "全抛", billableWeight: fullThrowWeight(actualWeight, length, width, height) };
-      return { unavailable: "三边合计达到 260cm 及以上" };
-    },
-    rateFor: ({ bracket, billableWeight }) => {
-      if (["0-0.5", "0.5-2.5"].includes(bracket.id)) {
-        return { base: 31, step: 5, label: "首重31元 + 续重5元/500g" };
-      }
-      if (bracket.id === "2.5-5") {
-        return { base: 31, step: 7, label: "首重31元 + 续重7元/500g" };
-      }
-      if (bracket.id === "5-10") {
-        return { base: 32, step: 7, label: "首重32元 + 续重7元/500g" };
-      }
-      if (bracket.id === "10-20") {
-        return { base: 33, step: 7, label: "首重33元 + 续重7元/500g" };
-      }
-      if (bracket.id === "20-30") {
-        return { flatPerKg: 20, label: "20元/kg", chargeWeight: roundUpKg(billableWeight) };
-      }
-      return { unavailable: "超过可选重量范围" };
-    },
-  },
-  {
-    name: "林道",
-    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
-      if (sum < 160) return { mode: "免抛", billableWeight: actualWeight };
-      if (sum < 260) return { mode: "全抛", billableWeight: fullThrowWeight(actualWeight, length, width, height) };
-      return { unavailable: "三边合计达到 260cm 及以上" };
-    },
-    rateFor: ({ bracket }) => {
-      if (["0-0.5", "0.5-2.5", "2.5-5", "5-10", "10-20"].includes(bracket.id)) {
-        return { base: 35, step: 5, label: "首重35元 + 续重5元/500g" };
-      }
-      return { unavailable: "超过可选重量范围" };
-    },
-  },
-  {
-    name: "盘古",
-    dimensionalRule: ({ sum, maxSide, actualWeight, length, width, height }) => {
-      if (sum >= 260) return { unavailable: "三边合计达到 260cm 及以上" };
-      const oversizedFee = maxSide > 200 ? 60 : maxSide > 100 ? 30 : 0;
-      const oversizedNote = oversizedFee ? `单边超长费 ${oversizedFee}元` : "";
-      if (sum < 140) {
-        return { mode: "免抛", billableWeight: actualWeight, extraFee: oversizedFee, extraNote: oversizedNote };
-      }
-      return {
-        mode: "半抛",
-        billableWeight: halfThrowWeight(actualWeight, length, width, height),
-        extraFee: oversizedFee,
-        extraNote: oversizedNote,
-      };
-    },
-    rateFor: ({ bracket }) => {
-      if (["0-0.5", "0.5-2.5", "2.5-5"].includes(bracket.id)) {
-        return { base: 33, step: 5, label: "首重33元 + 续重5元/500g" };
-      }
-      if (bracket.id === "5-10") {
-        return { base: 34, step: 5.5, label: "首重34元 + 续重5.5元/500g" };
-      }
-      if (bracket.id === "10-20") {
-        return { base: 35, step: 6, label: "首重35元 + 续重6元/500g" };
-      }
-      return { unavailable: "超过可选重量范围" };
-    },
-  },
-  {
-    name: "中外运",
-    dimensionalRule: ({ actualWeight }) => ({ mode: "免抛", billableWeight: actualWeight }),
-    rateFor: ({ bracket, billableWeight }) => {
-      if (["0-0.5", "0.5-2.5"].includes(bracket.id)) {
-        return { base: 33, step: 5, label: "首重33元 + 续重5元/500g" };
-      }
-      if (bracket.id === "2.5-5") {
-        return { base: 34, step: 5.5, label: "首重34元 + 续重5.5元/500g" };
-      }
-      if (["5-10", "10-20"].includes(bracket.id)) {
-        return { base: 35, step: 6, label: "首重35元 + 续重6元/500g" };
-      }
-      if (bracket.id === "20-30") {
-        return { base: 35, step: 6.5, label: "首重35元 + 续重6.5元/500g" };
-      }
-      return { flatPerKg: 15, label: "15元/kg", chargeWeight: roundUpKg(billableWeight) };
-    },
+    tiers: [
+      tier("0.5-5kg", 0, 5, 35, 5, 500),
+      tier("5.5-10kg", 5.5, 10, 35.5, 5.5, 500),
+      tier("10.5-20kg", 10.5, 20, 36, 6, 500),
+      tier("20.5-30kg", 20.5, 30, 37, 6.5, 500),
+    ],
     regionFee: ({ region }) => {
-      if (region === "okinawa") return { fee: 150, note: "冲绳偏远费 150元" };
-      if (region === "hokkaido") return { fee: 0, note: "北海道不额外收费" };
-      return { fee: 0, note: "" };
+      if (region === "okinawa") {
+        return manualFee("冲绳偏远费为实报实销，需人工确认最终附加费");
+      }
+      return noFee();
     },
   },
   {
-    name: "顺丰",
-    dimensionalRule: ({ sum, maxSide, actualWeight }) => {
-      const oversized = maxSide >= 120 || sum >= 150;
-      return {
-        mode: "免抛",
-        billableWeight: actualWeight,
-        extraFee: oversized ? 108 : 0,
-        extraNote: oversized ? "超出尺寸费 108元" : "",
-      };
-    },
-    rateFor: ({ bracket }) => {
-      if (["0-0.5", "0.5-2.5", "2.5-5", "5-10"].includes(bracket.id)) {
-        return { base: 31, step: 5, label: "首重31元 + 续重5元/500g" };
+    id: "shengxin-kuroneko-5cm",
+    carrier: "盛欣",
+    channel: "黑猫5CM渠道",
+    participates: true,
+    dimensionalRule: ({ actualWeight, length, width, height }) => {
+      if (!fitsBox(length, width, height, [35, 27, 5], true)) {
+        return unavailableDimensional("尺寸超过35cm x 27cm x 5cm，黑猫5CM不可选");
       }
-      return { unavailable: "超过可选重量范围" };
+      return dimensionalResult("免抛", actualWeight, ["满足35cm x 27cm x 5cm以内，按实重计费"]);
+    },
+    tiers: [tier("尺寸内不限重", 0, null, 28, 6, 500)],
+  },
+  {
+    id: "shengxin-battery",
+    carrier: "盛欣",
+    channel: "带电渠道",
+    participates: false,
+    recommendationNote: "带电渠道只展示，不参与最便宜推荐",
+    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
+      if (sum < 160) return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 160cm，免抛`]);
+      if (sum < 260) {
+        const billableWeight = halfThrowWeight(actualWeight, length, width, height, 6000);
+        return dimensionalResult("半抛", billableWeight, [
+          `带电渠道沿用盛欣尺寸规则：160-260cm半抛`,
+          `半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`,
+        ]);
+      }
+      return unavailableDimensional("三边合达到260cm及以上，盛欣带电不可选");
+    },
+    tiers: [tier("带电渠道", 0, 30, 40, 10, 500)],
+    regionFee: ({ region }) => {
+      if (region === "okinawa") return manualFee("冲绳偏远费未提供，需人工确认");
+      return noFee();
+    },
+  },
+  {
+    id: "ocs-ecommerce",
+    carrier: "OCS",
+    channel: "电商小包价格",
+    participates: true,
+    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
+      const steps = [];
+      let extraFee = 0;
+      if (sum < 120) {
+        steps.push(`三边合 ${formatNumber(sum)}cm < 120cm，免抛`);
+        return dimensionalResult("免抛", actualWeight, steps);
+      }
+      const billableWeight = fullThrowWeight(actualWeight, length, width, height, 5000);
+      steps.push(`三边合 ${formatNumber(sum)}cm 达到120cm，OCS按全抛`);
+      steps.push(`OCS体积重 = 长 × 宽 × 高 / 5000 = ${formatNumber(volumeWeight(length, width, height, 5000))}kg`);
+      steps.push(`全抛计费重 = 实重与OCS体积重取较大值 = ${formatNumber(billableWeight)}kg`);
+      if (sum >= 260) {
+        extraFee = 180;
+        steps.push("三边合达到260cm及以上，继续计算并加超尺寸费180元");
+      }
+      return dimensionalResult("全抛", billableWeight, steps, extraFee, extraFee ? "三边和>=260cm超尺寸费180元" : "");
+    },
+    tiers: [
+      tier("0-2kg", 0, 2, 31, 5, 500),
+      tier("2.5-5kg", 2.5, 5, 31, 6, 500),
+      tier("5.5-10kg", 5.5, 10, 32, 7, 500),
+      tier("10.5-20kg", 10.5, 20, 33, 7, 500),
+      perKgTier("20kg以上", 20, null, 20),
+    ],
+    regionFee: ({ ocsArea, chargeWeight }) => {
+      if (ocsArea === "remote") {
+        const fee = Math.max(roundUpKg(chargeWeight) * 12, 15);
+        return moneyFee(fee, `日本B2C偏远地区：12元/KG，最低15元，按${roundUpKg(chargeWeight)}kg计`);
+      }
+      if (ocsArea === "out-of-area") {
+        const fee = Math.max(roundUpKg(chargeWeight) * 18, 30);
+        return moneyFee(fee, `日本B2C超范围派送：18元/KG，最低30元，按${roundUpKg(chargeWeight)}kg计`);
+      }
+      return noFee("OCS偏远/超范围按邮编判断，当前选择普通邮编");
+    },
+    finalSurcharge: { fee: 1.5, note: "OCS固定附加费1.5元" },
+  },
+  {
+    id: "ocs-mailbox",
+    carrier: "OCS",
+    channel: "投函",
+    participates: true,
+    dimensionalRule: ({ actualWeight, length, width, height }) => {
+      if (actualWeight > 1) return unavailableDimensional("重量超过1kg，OCS投函不可选");
+      if (!fitsBox(length, width, height, [31.2, 22.8, 3], true)) {
+        return unavailableDimensional("尺寸超过31.2cm x 22.8cm x 3cm，OCS投函不可选");
+      }
+      return dimensionalResult("免抛", actualWeight, ["投函满足尺寸与1kg以内，按实重计费"]);
+    },
+    tiers: [tier("0-1kg", 0, 1, 16, 3, 500)],
+    regionFee: () => noFee("OCS投函全境无偏远"),
+    finalSurcharge: { fee: 1.5, note: "OCS固定附加费1.5元" },
+  },
+  {
+    id: "ocs-commercial",
+    carrier: "OCS",
+    channel: "商业件（大货）",
+    manualOnly: true,
+    manualReason: "需人工确认",
+    manualDetail: "OCS商业件无固定网页报价，需要人工核算确认。",
+  },
+  {
+    id: "yida-sagawa",
+    carrier: "义达",
+    channel: "义达-佐川",
+    participates: true,
+    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
+      if (sum < 130) return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 130cm，免抛`]);
+      if (sum <= 160) {
+        const billableWeight = halfThrowWeight(actualWeight, length, width, height, 6000);
+        return dimensionalResult("半抛", billableWeight, [
+          `三边合 ${formatNumber(sum)}cm 进入130-160cm半抛`,
+          `半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`,
+        ]);
+      }
+      return manualDimensional("三边和超过160cm，超长费暂时不清楚，需人工确认");
+    },
+    tiers: [
+      tier("0-2kg", 0, 2, 31, 5, 500),
+      tier("2-5kg", 2, 5, 31, 5, 500),
+      tier("5-10kg", 5, 10, 31, 5.5, 500),
+      tier("10-20kg", 10, 20, 31, 6, 500),
+    ],
+    regionFee: ({ region, chargeWeight }) => {
+      if (region === "okinawa") {
+        const fee = Math.max(roundUpKg(chargeWeight) * 10, 150);
+        return moneyFee(fee, `冲绳偏远费10元/KG，最低150元，按${roundUpKg(chargeWeight)}kg计`);
+      }
+      return noFee();
+    },
+  },
+  {
+    id: "yida-mini",
+    carrier: "义达",
+    channel: "MINI小包",
+    participates: true,
+    dimensionalRule: ({ actualWeight, length, width, height }) => {
+      if (actualWeight > 2) return unavailableDimensional("重量超过2kg，义达MINI小包不可选");
+      if (minSide(length, width, height) > 3) return unavailableDimensional("厚度超过3cm，义达MINI小包不可选");
+      return dimensionalResult("免抛", actualWeight, ["厚度3cm以内，按实重计费"]);
+    },
+    tiers: [tier("0-2kg", 0, 2, 19, 2, 500)],
+    regionFee: () => noFee("其它费用需另算，当前只按基础价显示"),
+  },
+  {
+    id: "lindao-sagawa",
+    carrier: "林道",
+    channel: "林道-佐川",
+    participates: true,
+    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
+      if (sum < 160) return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 160cm，免抛`]);
+      if (sum < 260) {
+        const billableWeight = fullThrowWeight(actualWeight, length, width, height, 6000);
+        return dimensionalResult("全抛", billableWeight, [
+          `三边合 ${formatNumber(sum)}cm 进入160-260cm全抛`,
+          `体积重 = 长 × 宽 × 高 / 6000 = ${formatNumber(volumeWeight(length, width, height, 6000))}kg`,
+          `全抛计费重 = 实重与体积重取较大值 = ${formatNumber(billableWeight)}kg`,
+        ]);
+      }
+      return unavailableDimensional("三边合达到260cm及以上，林道不可选");
+    },
+    tiers: [tier("0-20kg", 0, 20, 35, 5, 500)],
+    regionFee: ({ region }) => {
+      if (region === "hokkaido") return moneyFee(50, "北海道偏远费50元/票");
+      if (region === "okinawa") return unavailableFee("冲绳不接");
+      return noFee();
+    },
+  },
+  {
+    id: "lindao-battery",
+    carrier: "林道",
+    channel: "带电渠道",
+    participates: false,
+    recommendationNote: "带电渠道只展示，不参与最便宜推荐",
+    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
+      if (sum < 160) return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 160cm，免抛`]);
+      if (sum < 260) {
+        const billableWeight = fullThrowWeight(actualWeight, length, width, height, 6000);
+        return dimensionalResult("全抛", billableWeight, [
+          "带电渠道沿用林道尺寸规则：160-260cm全抛",
+          `全抛计费重 = ${formatNumber(billableWeight)}kg`,
+        ]);
+      }
+      return unavailableDimensional("三边合达到260cm及以上，林道带电不可选");
+    },
+    tiers: [tier("带电渠道", 0, 20, 40, 10, 500)],
+    regionFee: ({ region }) => {
+      if (region === "hokkaido") return moneyFee(50, "北海道偏远费50元/票");
+      if (region === "okinawa") return unavailableFee("冲绳不接");
+      return noFee();
+    },
+  },
+  {
+    id: "pangu-small",
+    carrier: "盘古",
+    channel: "电商小包 普货",
+    participates: true,
+    dimensionalRule: ({ sum, maxSide, actualWeight, length, width, height }) => {
+      if (sum > 260) return unavailableDimensional("三边和超过260cm，盘古小包不可发送");
+      const extraFee = oversizedPanguFee(maxSide);
+      const extraNote = oversizedPanguNote(maxSide, extraFee);
+      if (sum < 140) {
+        return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 140cm，免抛`], extraFee, extraNote);
+      }
+      const billableWeight = halfThrowWeight(actualWeight, length, width, height, 6000);
+      return dimensionalResult("半抛", billableWeight, [
+        `三边合 ${formatNumber(sum)}cm 达到140cm，按半抛`,
+        `半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`,
+      ], extraFee, extraNote);
+    },
+    tiers: [
+      tier("0-2kg", 0, 2, 33, 5, 500),
+      tier("2-10kg", 2, 10, 34, 5.5, 500),
+      tier("10-20kg", 10, 20, 35, 6, 500),
+    ],
+    fallbackManual: ({ chargeWeight }) => chargeWeight > 20
+      ? "实重/计费重20kg以上需单独确认，不参与自动推荐"
+      : "",
+    regionFee: ({ region, chargeWeight }) => {
+      if (region === "okinawa") {
+        if (chargeWeight <= 10) return moneyFee(100, "冲绳10kg内按最低偏远附加费100元/票");
+        const fee = Math.max(roundUpKg(chargeWeight) * 10, 200);
+        return moneyFee(fee, `冲绳超过10kg：10元/KG，最低200元，按${roundUpKg(chargeWeight)}kg计`);
+      }
+      if (region === "hokkaido") {
+        if (chargeWeight <= 10) return noFee("北海道10kg内免费");
+        const fee = Math.max(roundUpKg(chargeWeight) * 5, 50);
+        return moneyFee(fee, `北海道超过10kg：5元/KG，最低50元，按${roundUpKg(chargeWeight)}kg计`);
+      }
+      return noFee();
+    },
+  },
+  {
+    id: "pangu-post-3cm",
+    carrier: "盘古",
+    channel: "日本邮政3CM投函件",
+    participates: true,
+    dimensionalRule: ({ actualWeight, length, width, height }) => {
+      if (actualWeight > 1) return unavailableDimensional("重量超过1kg，盘古日本邮政3CM不可选");
+      if (!fitsBox(length, width, height, [29.7, 21, 3], true)) {
+        return unavailableDimensional("尺寸超过A4纸大小或厚度超过3cm，盘古日本邮政3CM不可选");
+      }
+      return dimensionalResult("免抛", actualWeight, ["厚3cm内、A4纸大小、1kg以内，按实重计费"]);
+    },
+    tiers: [tier("0.1-1kg", 0.1, 1, 18, 2, 100)],
+    regionFee: () => noFee("日本全国无偏远"),
+  },
+  {
+    id: "sinotrans-sagawa",
+    carrier: "中外运",
+    channel: "日本佐川经济小包（大件普货）",
+    participates: true,
+    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
+      let extraFee = 0;
+      const steps = [];
+      if (sum < 160) {
+        steps.push(`三边合 ${formatNumber(sum)}cm < 160cm，免抛`);
+        return dimensionalResult("免抛", actualWeight, steps);
+      }
+      const billableWeight = halfThrowWeight(actualWeight, length, width, height, 6000);
+      steps.push(`三边合 ${formatNumber(sum)}cm 达到160cm，按半抛`);
+      steps.push(`半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`);
+      if (sum > 260) {
+        extraFee = 200;
+        steps.push("三边超过260cm，部分可走并加200元/票");
+      }
+      return dimensionalResult("半抛", billableWeight, steps, extraFee, extraFee ? "三边超过260cm附加200元/票" : "");
+    },
+    tiers: [
+      tier("0-2kg", 0, 2, 33, 5, 500),
+      tier("2-5kg", 2, 5, 34, 5.5, 500),
+      tier("5-20kg", 5, 20, 35, 6, 500),
+      tier("20-30kg", 20, 30, 35, 6.5, 500),
+      perKgTier("30-50kg", 30, 50, 15),
+    ],
+    regionFee: ({ region }) => {
+      if (region === "okinawa") return moneyFee(150, "冲绳偏远费150元/票");
+      return noFee("普通地区/北海道无额外偏远费");
+    },
+  },
+  {
+    id: "sinotrans-mini",
+    carrier: "中外运",
+    channel: "日本黑猫MINI特快小包（普货）",
+    participates: true,
+    dimensionalRule: ({ actualWeight, length, width, height }) => {
+      if (actualWeight > 1) return unavailableDimensional("重量超过1kg，中外运黑猫MINI不可选");
+      const [longest, middle, shortest] = [length, width, height].sort((a, b) => b - a);
+      if (!(longest < 30 && middle < 20 && shortest <= 2.5)) {
+        return unavailableDimensional("尺寸超过厚<2.5cm、最长边<30cm、宽<20cm，中外运黑猫MINI不可选");
+      }
+      return dimensionalResult("免抛", actualWeight, ["满足黑猫MINI尺寸与1kg以内，按实重计费"]);
+    },
+    tiers: [tier("0-1kg", 0, 1, 17, 1.5, 100)],
+    regionFee: () => noFee("日本全境无偏远"),
+  },
+  {
+    id: "sinotrans-commercial",
+    carrier: "中外运",
+    channel: "日本商业件（ERP专用）",
+    manualOnly: true,
+    manualReason: "需人工确认",
+    manualDetail: "中外运商业件需要人工核算确认，网页不自动报价、不参与推荐。",
+  },
+  {
+    id: "sinotrans-pak",
+    carrier: "中外运",
+    channel: "日本邮政PAK小包（普货）",
+    participates: true,
+    dimensionalRule: ({ actualWeight }) => {
+      if (actualWeight > 3) return unavailableDimensional("重量超过3kg，中外运邮政PAK不可选");
+      return dimensionalResult("免抛", actualWeight, ["3kg内指定PAK袋/箱装，按实重计费"]);
+    },
+    tiers: [tier("0-3kg", 0, 3, 29, 6, 500)],
+    regionFee: () => noFee("日本全境无偏远"),
+  },
+  {
+    id: "sf",
+    carrier: "顺丰",
+    channel: "顺丰",
+    participates: true,
+    dimensionalRule: ({ sum, maxSide, actualWeight, length, width, height }) => {
+      if (sum > 150) return unavailableDimensional("三边和超过150cm，顺丰不可发");
+      const sfVolume = volumeWeight(length, width, height, 10000);
+      const billableWeight = Math.max(actualWeight, sfVolume);
+      const extraFee = maxSide > 120 ? 108 : 0;
+      const extraNote = extraFee ? "单边超过120cm，超长费108元/件" : "";
+      return dimensionalResult("计抛", billableWeight, [
+        `顺丰体积重 = 长 × 宽 × 高 / 10000 = ${formatNumber(sfVolume)}kg`,
+        `计费重 = 实重与顺丰体积重取较大值 = ${formatNumber(billableWeight)}kg`,
+      ], extraFee, extraNote);
+    },
+    tiers: [tier("0-30kg", 0, 30, 31, 5, 500)],
+    notRecommendedWhen: ({ chargeWeight }) => chargeWeight >= 10 ? "10kg以上不推荐但继续计算" : "",
+    regionFee: ({ region }) => {
+      if (region === "okinawa") return moneyFee(100, "冲绳偏远费100元/票");
+      return noFee();
     },
   },
 ];
@@ -205,18 +433,21 @@ const elements = {
   height: document.querySelector("#height"),
   weight: document.querySelector("#weight"),
   prefecture: document.querySelector("#prefecture"),
+  ocsArea: document.querySelector("#ocs-area"),
   dimensionSum: document.querySelector("#dimension-sum"),
   volumeWeight: document.querySelector("#volume-weight"),
   regionKind: document.querySelector("#region-kind"),
   bestCard: document.querySelector("#best-card"),
   resultsBody: document.querySelector("#results-body"),
   mobileResults: document.querySelector("#mobile-results"),
+  details: document.querySelector("#calculation-details"),
 };
 
 function init() {
   populatePrefectures();
   elements.form.addEventListener("input", calculateAndRender);
   elements.prefecture.addEventListener("change", calculateAndRender);
+  elements.ocsArea.addEventListener("change", calculateAndRender);
   elements.reset.addEventListener("click", resetForm);
   calculateAndRender();
 }
@@ -233,6 +464,7 @@ function resetForm() {
   elements.height.value = "";
   elements.weight.value = "";
   elements.prefecture.selectedIndex = 0;
+  elements.ocsArea.value = "normal";
   calculateAndRender();
 }
 
@@ -245,12 +477,13 @@ function calculateAndRender() {
     return;
   }
 
-  const rows = carriers.map((carrier) => calculateCarrier(carrier, input));
+  const rows = channelRules.map((channel) => calculateChannel(channel, input));
   const recommended = chooseRecommended(rows);
   const sortedRows = sortRows(rows, recommended);
   renderBest(recommended, rows);
   renderTable(sortedRows, recommended);
   renderCards(sortedRows, recommended);
+  renderDetails(sortedRows, recommended);
 }
 
 function getInput() {
@@ -267,6 +500,7 @@ function getInput() {
     actualWeight: weight,
     region,
     regionLabel: label || "普通地区",
+    ocsArea: elements.ocsArea.value,
     valid: [length, width, height, weight].every((value) => Number.isFinite(value) && value > 0),
   };
 }
@@ -282,12 +516,21 @@ function updateMetrics(input) {
     elements.volumeWeight.textContent = "--";
   } else {
     elements.dimensionSum.textContent = `${formatNumber(input.length + input.width + input.height)} cm`;
-    elements.volumeWeight.textContent = `${formatNumber(volumeWeight(input.length, input.width, input.height))} kg`;
+    elements.volumeWeight.textContent = `${formatNumber(volumeWeight(input.length, input.width, input.height, 6000))} kg`;
   }
   elements.regionKind.textContent = regionName(input.region);
 }
 
-function calculateCarrier(carrier, input) {
+function calculateChannel(channel, input) {
+  const displayName = `${channel.carrier} ${channel.channel}`;
+  const baseSteps = [
+    `三边合 ${formatNumber(input.length + input.width + input.height)}cm，最大边 ${formatNumber(Math.max(input.length, input.width, input.height))}cm，实重 ${formatNumber(input.actualWeight)}kg`,
+  ];
+
+  if (channel.manualOnly) {
+    return manualRow(channel, channel.manualReason || "需人工确认", [channel.manualDetail || "该渠道需人工核算确认。", ...baseSteps]);
+  }
+
   const dimensions = {
     length: input.length,
     width: input.width,
@@ -297,123 +540,206 @@ function calculateCarrier(carrier, input) {
     maxSide: Math.max(input.length, input.width, input.height),
   };
 
-  const dimensional = carrier.dimensionalRule(dimensions);
+  const dimensional = channel.dimensionalRule(dimensions);
+  const steps = [...baseSteps, ...dimensional.steps];
+
   if (dimensional.unavailable) {
-    return unavailableRow(carrier.name, dimensional.unavailable);
+    return unavailableRow(channel, dimensional.unavailable, steps);
+  }
+
+  if (dimensional.manual) {
+    return manualRow(channel, dimensional.manual, steps);
   }
 
   const billableWeight = Math.max(input.actualWeight, dimensional.billableWeight);
-  const bracket = getWeightBracket(billableWeight);
-  const rate = carrier.rateFor({
-    bracket,
-    billableWeight,
-    smallParcel: dimensional.smallParcel,
-  });
-  const displayBracket = rate.bracketOverride || bracket;
+  const tierInfo = resolveTier(channel, billableWeight);
 
-  if (rate.unavailable) {
-    return unavailableRow(carrier.name, rate.unavailable, {
-      bracket: displayBracket,
+  if (tierInfo.manual) {
+    return manualRow(channel, tierInfo.manual, [...steps, `计费重 ${formatNumber(billableWeight)}kg，${tierInfo.manual}`]);
+  }
+
+  if (!tierInfo.tier) {
+    return unavailableRow(channel, "超过可选重量范围", [...steps, `计费重 ${formatNumber(billableWeight)}kg，未匹配到表格重量段`], {
       billableWeight,
       method: dimensional.mode,
     });
   }
 
-  const baseFreight = rate.flatPerKg
-    ? roundCurrency(rate.chargeWeight * rate.flatPerKg)
-    : roundCurrency(rate.base + continuationUnits(billableWeight) * rate.step);
+  const price = calculatePrice(tierInfo.tier, billableWeight, tierInfo.tierWeight);
+  const regionFee = channel.regionFee ? channel.regionFee({
+    region: input.region,
+    ocsArea: input.ocsArea,
+    chargeWeight: price.chargeWeight,
+    billableWeight,
+  }) : noFee();
 
-  const regionFee = carrier.regionFee ? carrier.regionFee({ region: input.region }) : { fee: 0, note: "" };
-  const finalSurcharge = carrier.finalSurcharge || { fee: 0, note: "" };
-  const extraFee = (dimensional.extraFee || 0) + (regionFee.fee || 0) + (finalSurcharge.fee || 0);
-  const total = roundCurrency(baseFreight + extraFee);
-  const warnings = [];
-
-  if (rate.notRecommended) warnings.push(rate.notRecommended);
-  if (dimensional.extraNote) warnings.push(dimensional.extraNote);
-  if (regionFee.note) warnings.push(regionFee.note);
-  if (finalSurcharge.note) warnings.push(finalSurcharge.note);
-  if (input.region === "hokkaido" && !["盘古", "中外运"].includes(carrier.name)) {
-    warnings.push("北海道偏远费未提供，按基础价显示");
+  if (regionFee.unavailable) {
+    return unavailableRow(channel, regionFee.note, [...steps, regionFee.note], {
+      billableWeight,
+      chargeWeight: price.chargeWeight,
+      method: dimensional.mode,
+      tier: tierInfo.tier,
+    });
   }
 
-  const needsReview = input.region === "hokkaido" && !["盘古", "中外运"].includes(carrier.name);
-  const status = rate.notRecommended || needsReview ? "warn" : "ok";
+  if (regionFee.manual) {
+    return manualRow(channel, regionFee.note, [
+      ...steps,
+      ...price.steps,
+      `基础运费 ${formatCurrency(price.baseFreight)}；${regionFee.note}`,
+    ], {
+      billableWeight,
+      chargeWeight: price.chargeWeight,
+      method: dimensional.mode,
+      tier: tierInfo.tier,
+      baseFreight: price.baseFreight,
+    });
+  }
+
+  const extraItems = [];
+  if (dimensional.extraFee) extraItems.push({ fee: dimensional.extraFee, note: dimensional.extraNote || "尺寸附加费" });
+  if (regionFee.fee) extraItems.push({ fee: regionFee.fee, note: regionFee.note });
+  if (channel.finalSurcharge?.fee) extraItems.push(channel.finalSurcharge);
+
+  const extraFee = roundCurrency(extraItems.reduce((sum, item) => sum + item.fee, 0));
+  const total = roundCurrency(price.baseFreight + extraFee);
+  const warnings = [];
+
+  if (!channel.participates && channel.recommendationNote) warnings.push(channel.recommendationNote);
+  if (channel.notRecommendedWhen) {
+    const note = channel.notRecommendedWhen({ chargeWeight: price.chargeWeight, billableWeight, input });
+    if (note) warnings.push(note);
+  }
+  if (regionFee.warn && regionFee.note) warnings.push(regionFee.note);
+
+  const isWarn = warnings.length > 0 || !channel.participates;
+  const statusText = !channel.participates ? "不参与推荐" : isWarn ? "不推荐" : "可选";
+  const allSteps = [
+    ...steps,
+    `重量段匹配：${formatNumber(tierInfo.tierWeight)}kg 匹配 ${tierInfo.tier.label}`,
+    ...price.steps,
+  ];
+
+  if (extraItems.length) {
+    allSteps.push(`附加费：${extraItems.map((item) => `${item.note} ${formatCurrency(item.fee)}`).join("；")}`);
+  } else if (regionFee.note) {
+    allSteps.push(`附加费：${regionFee.note}`);
+  } else {
+    allSteps.push("附加费：无");
+  }
+  allSteps.push(`合计：${formatCurrency(price.baseFreight)} + ${formatCurrency(extraFee)} = ${formatCurrency(total)}`);
 
   return {
-    carrier: carrier.name,
-    status,
-    statusText: rate.notRecommended ? "不推荐" : needsReview ? "需确认" : "可选",
-    bracket: displayBracket,
+    id: channel.id,
+    carrier: channel.carrier,
+    channel: channel.channel,
+    displayName,
+    status: isWarn ? "warn" : "ok",
+    statusText,
+    eligible: channel.participates && !isWarn,
+    hasPrice: true,
+    tier: tierInfo.tier,
     billableWeight,
+    chargeWeight: price.chargeWeight,
     method: dimensional.mode,
-    rateLabel: rate.label,
-    baseFreight,
+    rateLabel: price.rateLabel,
+    baseFreight: price.baseFreight,
     extraFee,
     total,
     warnings,
-    available: true,
+    steps: allSteps,
   };
 }
 
-function unavailableRow(carrier, reason, partial = {}) {
+function resolveTier(channel, billableWeight) {
+  const defaultUnit = defaultUnitKg(channel.tiers);
+  const tierWeight = ceilToUnit(billableWeight, defaultUnit);
+  const fallbackManual = channel.fallbackManual ? channel.fallbackManual({ chargeWeight: tierWeight, billableWeight }) : "";
+  if (fallbackManual) return { manual: fallbackManual, tierWeight };
+
+  for (let index = 0; index < channel.tiers.length; index += 1) {
+    const previous = channel.tiers[index - 1];
+    const current = channel.tiers[index];
+    const next = channel.tiers[index + 1];
+    if (matchesTier(previous, current, next, tierWeight)) return { tier: current, tierWeight };
+  }
+  return { tier: null, tierWeight };
+}
+
+function matchesTier(previous, current, next, weight) {
+  const min = effectiveTierMin(previous, current);
+  const lowerOk = weight + 1e-9 >= min;
+  if (!lowerOk) return false;
+  if (current.max === null || current.max === undefined) return true;
+
+  const max = Number(current.max);
+  const nextStartsAtMax = next && Math.abs(Number(next.min || 0) - max) < 1e-9;
+  const exactBoundaryGoesNext = BOUNDARY_TO_NEXT_TIER.has(max);
+  if (nextStartsAtMax || exactBoundaryGoesNext) return weight < max - 1e-9;
+  return weight <= max + 1e-9;
+}
+
+function effectiveTierMin(previous, current) {
+  const min = Number(current.min || 0);
+  if (!previous || previous.max === null || previous.max === undefined) return min;
+  const previousMax = Number(previous.max);
+  if (BOUNDARY_TO_NEXT_TIER.has(previousMax) && min > previousMax) return previousMax;
+  return min;
+}
+
+function calculatePrice(tierConfig, billableWeight, tierWeight) {
+  if (tierConfig.perKg) {
+    const chargeWeight = roundUpKg(billableWeight);
+    const baseFreight = roundCurrency(chargeWeight * tierConfig.perKg);
+    return {
+      chargeWeight,
+      baseFreight,
+      rateLabel: `${formatCurrency(tierConfig.perKg)}/KG`,
+      steps: [
+        `按KG向上取整：${formatNumber(billableWeight)}kg -> ${formatNumber(chargeWeight)}kg`,
+        `运费 = ${formatCurrency(tierConfig.perKg)} × ${formatNumber(chargeWeight)} = ${formatCurrency(baseFreight)}`,
+      ],
+    };
+  }
+
+  const unitKg = tierConfig.unitG / 1000;
+  const chargeWeight = Math.max(ceilToUnit(billableWeight, unitKg), unitKg);
+  const unitCount = Math.max(1, Math.round(chargeWeight / unitKg));
+  const continuationCount = Math.max(0, unitCount - 1);
+  const continuationAmount = roundCurrency(continuationCount * tierConfig.step);
+  const baseFreight = roundCurrency(tierConfig.base + continuationAmount);
   return {
-    carrier,
-    status: "off",
-    statusText: "不可选",
-    reason,
-    available: false,
-    warnings: [reason],
-    ...partial,
+    chargeWeight,
+    baseFreight,
+    rateLabel: `首重${formatCurrency(tierConfig.base)} + 续重${formatCurrency(tierConfig.step)}/${tierConfig.unitG}g`,
+    steps: [
+      `按${tierConfig.unitG}g向上取整：${formatNumber(billableWeight)}kg -> ${formatNumber(chargeWeight)}kg`,
+      `首重 ${formatCurrency(tierConfig.base)}，续重次数 ${continuationCount}`,
+      `续重金额 = ${formatCurrency(tierConfig.step)} × ${continuationCount} = ${formatCurrency(continuationAmount)}`,
+      `基础运费 = ${formatCurrency(tierConfig.base)} + ${formatCurrency(continuationAmount)} = ${formatCurrency(baseFreight)}`,
+    ],
+    tierWeight,
   };
-}
-
-function volumeWeight(length, width, height) {
-  return (length * width * height) / 6000;
-}
-
-function fullThrowWeight(actualWeight, length, width, height) {
-  return Math.max(actualWeight, volumeWeight(length, width, height) / 2);
-}
-
-function halfThrowWeight(actualWeight, length, width, height) {
-  return (volumeWeight(length, width, height) + actualWeight) / 2;
-}
-
-function continuationUnits(weight) {
-  return Math.max(0, Math.ceil((weight - 0.5) / 0.5));
-}
-
-function roundUpKg(weight) {
-  return Math.ceil(weight);
-}
-
-function getWeightBracket(weight) {
-  if (weight < 0.5) return { id: "0-0.5", label: "0-0.5kg" };
-  if (weight < 2.5) return { id: "0.5-2.5", label: "0.5-2.5kg" };
-  if (weight < 5) return { id: "2.5-5", label: "2.5-5kg" };
-  if (weight < 10) return { id: "5-10", label: "5-10kg" };
-  if (weight < 20) return { id: "10-20", label: "10-20kg" };
-  if (weight < 30) return { id: "20-30", label: "20-30kg" };
-  return { id: "30+", label: "30kg以上" };
 }
 
 function chooseRecommended(rows) {
-  const regular = rows.filter((row) => row.available && row.status === "ok");
-  const fallback = rows.filter((row) => row.available);
-  const candidates = regular.length ? regular : fallback;
-  return candidates.reduce((best, row) => (!best || row.total < best.total ? row : best), null);
+  return rows
+    .filter((row) => row.hasPrice && row.eligible)
+    .reduce((best, row) => (!best || row.total < best.total ? row : best), null);
 }
 
 function sortRows(rows, recommended) {
+  const statusRank = { ok: 0, warn: 1, manual: 2, off: 3 };
   return [...rows].sort((a, b) => {
     if (recommended) {
-      if (a.carrier === recommended.carrier) return -1;
-      if (b.carrier === recommended.carrier) return 1;
+      if (a.id === recommended.id) return -1;
+      if (b.id === recommended.id) return 1;
     }
-    if (a.available !== b.available) return a.available ? -1 : 1;
-    if (a.available && b.available) return a.total - b.total;
-    return a.carrier.localeCompare(b.carrier, "zh-CN");
+    if (a.hasPrice !== b.hasPrice) return a.hasPrice ? -1 : 1;
+    if (a.hasPrice && b.hasPrice && a.total !== b.total) return a.total - b.total;
+    const rankDiff = (statusRank[a.status] || 9) - (statusRank[b.status] || 9);
+    if (rankDiff) return rankDiff;
+    return a.displayName.localeCompare(b.displayName, "zh-CN");
   });
 }
 
@@ -422,65 +748,205 @@ function renderEmpty() {
   elements.bestCard.innerHTML = "<span>输入包裹规格后自动核算</span>";
   elements.resultsBody.innerHTML = '<tr><td colspan="7" class="empty-row">等待输入包裹规格</td></tr>';
   elements.mobileResults.innerHTML = "";
+  elements.details.innerHTML = '<p class="empty-row">等待输入包裹规格</p>';
 }
 
 function renderBest(recommended, rows) {
   if (!recommended) {
     elements.bestCard.className = "best-card empty";
-    elements.bestCard.innerHTML = "<span>当前规格没有可选快递</span>";
+    elements.bestCard.innerHTML = "<span>当前规格没有可自动推荐的报价</span>";
     return;
   }
 
-  const availableCount = rows.filter((row) => row.available).length;
-  const warning = recommended.status === "warn" ? "，但该渠道标注不推荐" : "";
+  const quotedCount = rows.filter((row) => row.hasPrice).length;
   elements.bestCard.className = "best-card";
   elements.bestCard.innerHTML = `
-    <div class="carrier">${recommended.carrier}</div>
+    <div class="carrier">${escapeHtml(recommended.carrier)}</div>
+    <div class="channel">${escapeHtml(recommended.channel)}</div>
     <div class="price">${formatCurrency(recommended.total)}</div>
-    <div class="subline">${recommended.method}，计费重 ${formatNumber(recommended.billableWeight)}kg。共 ${availableCount} 个可选报价${warning}。</div>
+    <div class="subline">${recommended.method}，收费重 ${formatNumber(recommended.chargeWeight)}kg。共 ${quotedCount} 个已报价渠道。</div>
   `;
 }
 
 function renderTable(rows, recommended) {
   elements.resultsBody.innerHTML = rows.map((row) => `
-    <tr class="${recommended && row.carrier === recommended.carrier ? "best-row" : ""}">
-      <td class="carrier-cell">${row.carrier}</td>
+    <tr class="${recommended && row.id === recommended.id ? "best-row" : ""}">
+      <td class="carrier-cell">
+        <strong>${escapeHtml(row.carrier)}</strong>
+        <span>${escapeHtml(row.channel)}</span>
+      </td>
       <td>${statusBadge(row)}${notesMarkup(row)}</td>
-      <td>${row.bracket ? row.bracket.label : "--"}</td>
-      <td>${row.billableWeight ? `${formatNumber(row.billableWeight)} kg` : "--"}${row.method ? `<div class="muted">${row.method}</div>` : ""}</td>
+      <td>${row.tier ? escapeHtml(row.tier.label) : "--"}</td>
+      <td>${row.chargeWeight ? `${formatNumber(row.chargeWeight)} kg` : row.billableWeight ? `${formatNumber(row.billableWeight)} kg` : "--"}${row.method ? `<div class="muted">${escapeHtml(row.method)}</div>` : ""}</td>
       <td>${row.rateLabel || "--"}</td>
-      <td>${row.available ? formatCurrency(row.extraFee || 0) : "--"}</td>
-      <td class="price-cell">${row.available ? formatCurrency(row.total) : "--"}</td>
+      <td>${row.hasPrice ? formatCurrency(row.extraFee || 0) : "--"}</td>
+      <td class="price-cell">${row.hasPrice ? formatCurrency(row.total) : "--"}</td>
     </tr>
   `).join("");
 }
 
 function renderCards(rows, recommended) {
   elements.mobileResults.innerHTML = rows.map((row) => `
-    <article class="result-card ${recommended && row.carrier === recommended.carrier ? "best-card-row" : ""}">
+    <article class="result-card ${recommended && row.id === recommended.id ? "best-card-row" : ""}">
       <div class="card-head">
         <div>
-          <div class="card-name">${row.carrier}</div>
+          <div class="card-name">${escapeHtml(row.carrier)}</div>
+          <div class="card-channel">${escapeHtml(row.channel)}</div>
           ${statusBadge(row)}
         </div>
-        <div class="card-price">${row.available ? formatCurrency(row.total) : "--"}</div>
+        <div class="card-price">${row.hasPrice ? formatCurrency(row.total) : "--"}</div>
       </div>
-      <div class="card-line"><span>重量档</span><strong>${row.bracket ? row.bracket.label : "--"}</strong></div>
-      <div class="card-line"><span>计费重</span><strong>${row.billableWeight ? `${formatNumber(row.billableWeight)} kg` : "--"}</strong></div>
+      <div class="card-line"><span>重量档</span><strong>${row.tier ? escapeHtml(row.tier.label) : "--"}</strong></div>
+      <div class="card-line"><span>计费重</span><strong>${row.chargeWeight ? `${formatNumber(row.chargeWeight)} kg` : row.billableWeight ? `${formatNumber(row.billableWeight)} kg` : "--"}</strong></div>
       <div class="card-line"><span>计费方式</span><strong>${row.rateLabel || "--"}</strong></div>
-      <div class="card-line"><span>附加费</span><strong>${row.available ? formatCurrency(row.extraFee || 0) : "--"}</strong></div>
+      <div class="card-line"><span>附加费</span><strong>${row.hasPrice ? formatCurrency(row.extraFee || 0) : "--"}</strong></div>
       ${row.warnings.length ? `<div class="card-line"><span>备注</span><strong>${escapeHtml(row.warnings.join("；"))}</strong></div>` : ""}
     </article>
   `).join("");
 }
 
+function renderDetails(rows, recommended) {
+  elements.details.innerHTML = rows.map((row) => `
+    <article class="detail-card ${recommended && row.id === recommended.id ? "best-detail" : ""}">
+      <div class="detail-head">
+        <div>
+          <strong>${escapeHtml(row.carrier)}</strong>
+          <span>${escapeHtml(row.channel)}</span>
+        </div>
+        ${statusBadge(row)}
+      </div>
+      <ol class="step-list">
+        ${row.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}
+      </ol>
+    </article>
+  `).join("");
+}
+
 function statusBadge(row) {
-  return `<span class="badge ${row.status}">${row.statusText}</span>`;
+  return `<span class="badge ${row.status}">${escapeHtml(row.statusText)}</span>`;
 }
 
 function notesMarkup(row) {
-  if (!row.warnings.length) return "";
+  if (!row.warnings?.length) return "";
   return `<div class="muted">${escapeHtml(row.warnings.join("；"))}</div>`;
+}
+
+function unavailableRow(channel, reason, steps = [], partial = {}) {
+  return {
+    id: channel.id,
+    carrier: channel.carrier,
+    channel: channel.channel,
+    displayName: `${channel.carrier} ${channel.channel}`,
+    status: "off",
+    statusText: "不可选",
+    eligible: false,
+    hasPrice: false,
+    warnings: [reason],
+    steps: steps[steps.length - 1] === reason ? steps : [...steps, reason],
+    ...partial,
+  };
+}
+
+function manualRow(channel, reason, steps = [], partial = {}) {
+  return {
+    id: channel.id,
+    carrier: channel.carrier,
+    channel: channel.channel,
+    displayName: `${channel.carrier} ${channel.channel}`,
+    status: "manual",
+    statusText: "需人工确认",
+    eligible: false,
+    hasPrice: false,
+    warnings: [reason],
+    steps: steps.length ? steps : [reason],
+    ...partial,
+  };
+}
+
+function dimensionalResult(mode, billableWeight, steps, extraFee = 0, extraNote = "") {
+  return { mode, billableWeight, steps, extraFee, extraNote };
+}
+
+function unavailableDimensional(reason) {
+  return { unavailable: reason, steps: [reason] };
+}
+
+function manualDimensional(reason) {
+  return { manual: reason, steps: [reason] };
+}
+
+function moneyFee(fee, note) {
+  return { fee: roundCurrency(fee), note };
+}
+
+function noFee(note = "", warn = false) {
+  return { fee: 0, note, warn };
+}
+
+function manualFee(note) {
+  return { manual: true, note };
+}
+
+function unavailableFee(note) {
+  return { unavailable: true, note };
+}
+
+function tier(label, min, max, base, step, unitG) {
+  return { label, min, max, base, step, unitG };
+}
+
+function perKgTier(label, min, max, perKg) {
+  return { label, min, max, perKg };
+}
+
+function defaultUnitKg(tiers) {
+  const firstUnitTier = tiers.find((item) => item.unitG);
+  return firstUnitTier ? firstUnitTier.unitG / 1000 : 1;
+}
+
+function volumeWeight(length, width, height, divisor) {
+  return (length * width * height) / divisor;
+}
+
+function fullThrowWeight(actualWeight, length, width, height, divisor) {
+  return Math.max(actualWeight, volumeWeight(length, width, height, divisor));
+}
+
+function halfThrowWeight(actualWeight, length, width, height, divisor) {
+  return (volumeWeight(length, width, height, divisor) + actualWeight) / 2;
+}
+
+function ceilToUnit(value, unit) {
+  return roundCurrency(Math.ceil((value - 1e-9) / unit) * unit);
+}
+
+function roundUpKg(weight) {
+  return Math.ceil(weight - 1e-9);
+}
+
+function oversizedPanguFee(maxSide) {
+  let fee = 0;
+  if (maxSide > 160) fee += 30;
+  if (maxSide > 200) fee += 60;
+  return fee;
+}
+
+function oversizedPanguNote(maxSide, fee) {
+  if (!fee) return "";
+  if (maxSide > 200) return "单边超过160cm加30元，超过200cm额外加60元";
+  return "单边超过160cm加30元";
+}
+
+function fitsBox(length, width, height, limits, inclusive) {
+  const sides = [length, width, height].sort((a, b) => b - a);
+  const sortedLimits = [...limits].sort((a, b) => b - a);
+  return sides.every((side, index) => inclusive
+    ? side <= sortedLimits[index] + 1e-9
+    : side < sortedLimits[index] - 1e-9);
+}
+
+function minSide(length, width, height) {
+  return Math.min(length, width, height);
 }
 
 function formatCurrency(value) {
@@ -497,7 +963,7 @@ function formatNumber(value) {
 }
 
 function roundCurrency(value) {
-  return Math.round(value * 100) / 100;
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function regionName(region) {
@@ -516,6 +982,3 @@ function escapeHtml(value) {
 }
 
 init();
-
-
-

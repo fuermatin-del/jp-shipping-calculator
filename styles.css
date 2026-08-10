@@ -10,7 +10,7 @@
   --accent: #0f7b6c;
   --accent-dark: #0b5f54;
   --accent-soft: #dff4ef;
-  --warn: #b46a00;
+  --warn: #9a5b00;
   --warn-soft: #fff2d7;
   --danger: #b42318;
   --danger-soft: #ffe6e2;
@@ -43,7 +43,7 @@ select {
 }
 
 .workspace {
-  width: min(1180px, 100%);
+  width: min(1320px, 100%);
   margin: 0 auto;
 }
 
@@ -97,9 +97,18 @@ h2 {
   align-items: stretch;
 }
 
+.quote-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+}
+
 .input-panel,
 .summary-panel,
 .results-panel,
+.detail-panel,
 .rules-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -108,14 +117,15 @@ h2 {
 }
 
 .input-panel,
-.summary-panel {
+.summary-panel,
+.results-panel,
+.detail-panel,
+.rules-panel {
   padding: 20px;
 }
 
-.results-panel,
 .rules-panel {
   margin-top: 16px;
-  padding: 20px;
 }
 
 .panel-heading {
@@ -124,6 +134,10 @@ h2 {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
+}
+
+.compact-heading {
+  margin-bottom: 12px;
 }
 
 .ghost-button {
@@ -147,16 +161,19 @@ h2 {
   gap: 12px;
 }
 
+.option-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.7fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+
 .field {
   display: grid;
   gap: 7px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
-}
-
-.full-field {
-  margin-top: 14px;
 }
 
 .input-unit {
@@ -247,7 +264,7 @@ select:focus,
   display: grid;
   align-content: center;
   flex: 1;
-  min-height: 208px;
+  min-height: 228px;
   border-radius: 8px;
   background: var(--accent-soft);
   padding: 18px;
@@ -262,6 +279,13 @@ select:focus,
 .best-card .carrier {
   font-size: 28px;
   font-weight: 800;
+}
+
+.best-card .channel {
+  margin-top: 5px;
+  color: var(--accent-dark);
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .best-card .price {
@@ -317,7 +341,7 @@ select:focus,
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 980px;
 }
 
 th,
@@ -345,7 +369,22 @@ tbody tr.best-row {
 }
 
 .carrier-cell {
-  font-weight: 800;
+  min-width: 178px;
+}
+
+.carrier-cell strong,
+.carrier-cell span {
+  display: block;
+}
+
+.carrier-cell strong {
+  font-weight: 900;
+}
+
+.carrier-cell span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .price-cell {
@@ -374,7 +413,8 @@ tbody tr.best-row {
   color: var(--accent-dark);
 }
 
-.badge.warn {
+.badge.warn,
+.badge.manual {
   background: var(--warn-soft);
   color: var(--warn);
 }
@@ -394,18 +434,24 @@ tbody tr.best-row {
   display: none;
 }
 
-.result-card {
+.result-card,
+.detail-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
+}
+
+.result-card {
   padding: 14px;
 }
 
-.result-card + .result-card {
+.result-card + .result-card,
+.detail-card + .detail-card {
   margin-top: 10px;
 }
 
-.result-card.best-card-row {
+.result-card.best-card-row,
+.detail-card.best-detail {
   border-color: rgba(15, 123, 108, 0.45);
   background: rgba(15, 123, 108, 0.07);
 }
@@ -425,6 +471,12 @@ tbody tr.best-row {
 .card-name {
   font-size: 18px;
   font-weight: 900;
+}
+
+.card-channel {
+  margin: 3px 0 7px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .card-price {
@@ -448,6 +500,59 @@ tbody tr.best-row {
   text-align: right;
 }
 
+.detail-panel {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+}
+
+.detail-list {
+  max-height: calc(100vh - 116px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.detail-card {
+  padding: 12px;
+}
+
+.detail-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 9px;
+}
+
+.detail-head strong,
+.detail-head span {
+  display: block;
+}
+
+.detail-head strong {
+  font-weight: 900;
+}
+
+.detail-head span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.step-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.step-list li + li {
+  margin-top: 4px;
+}
+
 .rules-panel h2 {
   margin-bottom: 12px;
 }
@@ -465,6 +570,21 @@ tbody tr.best-row {
   padding: 8px 10px;
   color: var(--muted);
   font-size: 13px;
+}
+
+@media (max-width: 1100px) {
+  .quote-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-panel {
+    position: static;
+    max-height: none;
+  }
+
+  .detail-list {
+    max-height: 560px;
+  }
 }
 
 @media (max-width: 860px) {
@@ -491,7 +611,8 @@ tbody tr.best-row {
   }
 
   .field-grid,
-  .metric-row {
+  .metric-row,
+  .option-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -516,12 +637,14 @@ tbody tr.best-row {
   .input-panel,
   .summary-panel,
   .results-panel,
+  .detail-panel,
   .rules-panel {
     padding: 15px;
   }
 
   .field-grid,
-  .metric-row {
+  .metric-row,
+  .option-grid {
     grid-template-columns: 1fr;
   }
 
