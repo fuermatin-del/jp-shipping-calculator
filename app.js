@@ -66,7 +66,11 @@ const channelRules = [
         return dimensionalResult("半抛", billableWeight, [
           `三边合 ${formatNumber(sum)}cm 进入160-260cm半抛`,
           `半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`,
-        ]);
+          "盛欣半抛按半抛结果计费，不再与实重取较大值；重量档仍按实重匹配",
+        ], 0, "", {
+          directBillableWeight: true,
+          tierBasisWeight: actualWeight,
+        });
       }
       return unavailableDimensional("三边合达到260cm及以上，盛欣普货不可选");
     },
@@ -109,7 +113,11 @@ const channelRules = [
         return dimensionalResult("半抛", billableWeight, [
           `带电渠道沿用盛欣尺寸规则：160-260cm半抛`,
           `半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`,
-        ]);
+          "盛欣带电半抛按半抛结果计费，不再与实重取较大值；重量档仍按实重匹配",
+        ], 0, "", {
+          directBillableWeight: true,
+          tierBasisWeight: actualWeight,
+        });
       }
       return unavailableDimensional("三边合达到260cm及以上，盛欣带电不可选");
     },
@@ -346,11 +354,15 @@ const channelRules = [
       const billableWeight = halfThrowWeight(actualWeight, length, width, height, 6000);
       steps.push(`三边合 ${formatNumber(sum)}cm 达到160cm，按半抛`);
       steps.push(`半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`);
+      steps.push("中外运半抛按半抛结果计费，不再与实重取较大值；重量档仍按实重匹配");
       if (sum > 260) {
         extraFee = 200;
         steps.push("三边超过260cm，部分可走并加200元/票");
       }
-      return dimensionalResult("半抛", billableWeight, steps, extraFee, extraFee ? "三边超过260cm附加200元/票" : "");
+      return dimensionalResult("半抛", billableWeight, steps, extraFee, extraFee ? "三边超过260cm附加200元/票" : "", {
+        directBillableWeight: true,
+        tierBasisWeight: actualWeight,
+      });
     },
     tiers: [
       tier("0-2kg", 0, 2, 33, 5, 500),
@@ -551,8 +563,11 @@ function calculateChannel(channel, input) {
     return manualRow(channel, dimensional.manual, steps);
   }
 
-  const billableWeight = Math.max(input.actualWeight, dimensional.billableWeight);
-  const tierInfo = resolveTier(channel, billableWeight);
+  const billableWeight = dimensional.directBillableWeight
+    ? dimensional.billableWeight
+    : Math.max(input.actualWeight, dimensional.billableWeight);
+  const tierBasisWeight = dimensional.tierBasisWeight ?? billableWeight;
+  const tierInfo = resolveTier(channel, tierBasisWeight);
 
   if (tierInfo.manual) {
     return manualRow(channel, tierInfo.manual, [...steps, `计费重 ${formatNumber(billableWeight)}kg，${tierInfo.manual}`]);
@@ -863,8 +878,8 @@ function manualRow(channel, reason, steps = [], partial = {}) {
   };
 }
 
-function dimensionalResult(mode, billableWeight, steps, extraFee = 0, extraNote = "") {
-  return { mode, billableWeight, steps, extraFee, extraNote };
+function dimensionalResult(mode, billableWeight, steps, extraFee = 0, extraNote = "", options = {}) {
+  return { mode, billableWeight, steps, extraFee, extraNote, ...options };
 }
 
 function unavailableDimensional(reason) {

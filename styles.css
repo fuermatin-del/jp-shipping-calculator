@@ -335,13 +335,14 @@ select:focus,
 }
 
 .desktop-table-wrap {
-  overflow-x: auto;
+  overflow-x: visible;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 980px;
+  table-layout: fixed;
+  min-width: 0;
 }
 
 th,
@@ -362,6 +363,42 @@ th {
 td {
   font-size: 14px;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+th:nth-child(1),
+td:nth-child(1) {
+  width: 17%;
+}
+
+th:nth-child(2),
+td:nth-child(2) {
+  width: 20%;
+}
+
+th:nth-child(3),
+td:nth-child(3),
+th:nth-child(4),
+td:nth-child(4) {
+  width: 11%;
+}
+
+th:nth-child(5),
+td:nth-child(5) {
+  width: 20%;
+}
+
+th:nth-child(6),
+td:nth-child(6) {
+  width: 9%;
+  text-align: right;
+}
+
+th:nth-child(7),
+td:nth-child(7) {
+  width: 12%;
+  text-align: right;
 }
 
 tbody tr.best-row {
@@ -369,7 +406,7 @@ tbody tr.best-row {
 }
 
 .carrier-cell {
-  min-width: 178px;
+  min-width: 0;
 }
 
 .carrier-cell strong,
