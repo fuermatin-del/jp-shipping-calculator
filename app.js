@@ -62,15 +62,11 @@ const channelRules = [
         return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 160cm，免抛`]);
       }
       if (sum < 260) {
-        const billableWeight = halfThrowWeight(actualWeight, length, width, height, 6000);
-        return dimensionalResult("半抛", billableWeight, [
+        const half = halfThrowResult(actualWeight, length, width, height, 6000);
+        return dimensionalResult("半抛", half.billableWeight, [
           `三边合 ${formatNumber(sum)}cm 进入160-260cm半抛`,
-          `半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`,
-          "盛欣半抛按半抛结果计费，不再与实重取较大值；重量档仍按实重匹配",
-        ], 0, "", {
-          directBillableWeight: true,
-          tierBasisWeight: actualWeight,
-        });
+          ...half.steps,
+        ]);
       }
       return unavailableDimensional("三边合达到260cm及以上，盛欣普货不可选");
     },
@@ -109,15 +105,11 @@ const channelRules = [
     dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
       if (sum < 160) return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 160cm，免抛`]);
       if (sum < 260) {
-        const billableWeight = halfThrowWeight(actualWeight, length, width, height, 6000);
-        return dimensionalResult("半抛", billableWeight, [
+        const half = halfThrowResult(actualWeight, length, width, height, 6000);
+        return dimensionalResult("半抛", half.billableWeight, [
           `带电渠道沿用盛欣尺寸规则：160-260cm半抛`,
-          `半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`,
-          "盛欣带电半抛按半抛结果计费，不再与实重取较大值；重量档仍按实重匹配",
-        ], 0, "", {
-          directBillableWeight: true,
-          tierBasisWeight: actualWeight,
-        });
+          ...half.steps,
+        ]);
       }
       return unavailableDimensional("三边合达到260cm及以上，盛欣带电不可选");
     },
@@ -135,38 +127,55 @@ const channelRules = [
     dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
       const steps = [];
       let extraFee = 0;
-      if (sum < 120) {
-        steps.push(`三边合 ${formatNumber(sum)}cm < 120cm，免抛`);
+      if (sum <= 140) {
+        steps.push(`三边合 ${formatNumber(sum)}cm <= 140cm，OCS 8.26规则免抛`);
         return dimensionalResult("免抛", actualWeight, steps);
       }
       const billableWeight = fullThrowWeight(actualWeight, length, width, height, 5000);
-      steps.push(`三边合 ${formatNumber(sum)}cm 达到120cm，OCS按全抛`);
+      steps.push(`三边合 ${formatNumber(sum)}cm > 140cm，OCS 8.26规则按全抛`);
       steps.push(`OCS体积重 = 长 × 宽 × 高 / 5000 = ${formatNumber(volumeWeight(length, width, height, 5000))}kg`);
       steps.push(`全抛计费重 = 实重与OCS体积重取较大值 = ${formatNumber(billableWeight)}kg`);
-      if (sum >= 260) {
+      if (sum > 260) {
         extraFee = 180;
-        steps.push("三边合达到260cm及以上，继续计算并加超尺寸费180元");
+        steps.push("三边合超过260cm，继续计算并加超尺寸费180元");
       }
-      return dimensionalResult("全抛", billableWeight, steps, extraFee, extraFee ? "三边和>=260cm超尺寸费180元" : "");
+      return dimensionalResult("全抛", billableWeight, steps, extraFee, extraFee ? "三边和>260cm超尺寸费180元" : "");
     },
     tiers: [
       tier("0-2kg", 0, 2, 31, 5, 500),
-      tier("2.5-5kg", 2.5, 5, 31, 6, 500),
-      tier("5.5-10kg", 5.5, 10, 32, 7, 500),
+      tier("2.5-5kg", 2.5, 5, 31, 5, 500),
+      tier("5.5-10kg", 5.5, 10, 32, 5.5, 500),
       tier("10.5-20kg", 10.5, 20, 33, 7, 500),
       perKgTier("20kg以上", 20, null, 20),
     ],
-    regionFee: ({ ocsArea, chargeWeight }) => {
-      if (ocsArea === "remote") {
-        const fee = Math.max(roundUpKg(chargeWeight) * 12, 15);
-        return moneyFee(fee, `日本B2C偏远地区：12元/KG，最低15元，按${roundUpKg(chargeWeight)}kg计`);
+    regionFee: ocsRegionFee,
+    finalSurcharge: { fee: 1.5, note: "OCS固定附加费1.5元" },
+  },
+  {
+    id: "ocs-battery",
+    carrier: "OCS",
+    channel: "带电渠道",
+    participates: false,
+    recommendationNote: "OCS带电渠道只展示，不参与最便宜推荐",
+    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
+      const steps = [];
+      let extraFee = 0;
+      if (sum <= 140) {
+        steps.push(`三边合 ${formatNumber(sum)}cm <= 140cm，OCS带电8.26规则免抛`);
+        return dimensionalResult("免抛", actualWeight, steps);
       }
-      if (ocsArea === "out-of-area") {
-        const fee = Math.max(roundUpKg(chargeWeight) * 18, 30);
-        return moneyFee(fee, `日本B2C超范围派送：18元/KG，最低30元，按${roundUpKg(chargeWeight)}kg计`);
+      const billableWeight = fullThrowWeight(actualWeight, length, width, height, 5000);
+      steps.push(`三边合 ${formatNumber(sum)}cm > 140cm，OCS带电8.26规则按全抛`);
+      steps.push(`OCS体积重 = 长 × 宽 × 高 / 5000 = ${formatNumber(volumeWeight(length, width, height, 5000))}kg`);
+      steps.push(`全抛计费重 = 实重与OCS体积重取较大值 = ${formatNumber(billableWeight)}kg`);
+      if (sum > 260) {
+        extraFee = 180;
+        steps.push("三边合超过260cm，继续计算并加超尺寸费180元");
       }
-      return noFee("OCS偏远/超范围按邮编判断，当前选择普通邮编");
+      return dimensionalResult("全抛", billableWeight, steps, extraFee, extraFee ? "三边和>260cm超尺寸费180元" : "");
     },
+    tiers: [tier("带电渠道", 0, null, 38, 10, 500)],
+    regionFee: ocsRegionFee,
     finalSurcharge: { fee: 1.5, note: "OCS固定附加费1.5元" },
   },
   {
@@ -201,10 +210,10 @@ const channelRules = [
     dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
       if (sum < 130) return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 130cm，免抛`]);
       if (sum <= 160) {
-        const billableWeight = halfThrowWeight(actualWeight, length, width, height, 6000);
-        return dimensionalResult("半抛", billableWeight, [
+        const half = halfThrowResult(actualWeight, length, width, height, 6000);
+        return dimensionalResult("半抛", half.billableWeight, [
           `三边合 ${formatNumber(sum)}cm 进入130-160cm半抛`,
-          `半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`,
+          ...half.steps,
         ]);
       }
       return manualDimensional("三边和超过160cm，超长费暂时不清楚，需人工确认");
@@ -296,10 +305,10 @@ const channelRules = [
       if (sum < 140) {
         return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 140cm，免抛`], extraFee, extraNote);
       }
-      const billableWeight = halfThrowWeight(actualWeight, length, width, height, 6000);
-      return dimensionalResult("半抛", billableWeight, [
+      const half = halfThrowResult(actualWeight, length, width, height, 6000);
+      return dimensionalResult("半抛", half.billableWeight, [
         `三边合 ${formatNumber(sum)}cm 达到140cm，按半抛`,
-        `半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`,
+        ...half.steps,
       ], extraFee, extraNote);
     },
     tiers: [
@@ -351,18 +360,14 @@ const channelRules = [
         steps.push(`三边合 ${formatNumber(sum)}cm < 160cm，免抛`);
         return dimensionalResult("免抛", actualWeight, steps);
       }
-      const billableWeight = halfThrowWeight(actualWeight, length, width, height, 6000);
       steps.push(`三边合 ${formatNumber(sum)}cm 达到160cm，按半抛`);
-      steps.push(`半抛 = (${formatNumber(volumeWeight(length, width, height, 6000))} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(billableWeight)}kg`);
-      steps.push("中外运半抛按半抛结果计费，不再与实重取较大值；重量档仍按实重匹配");
+      const half = halfThrowResult(actualWeight, length, width, height, 6000);
+      steps.push(...half.steps);
       if (sum > 260) {
         extraFee = 200;
         steps.push("三边超过260cm，部分可走并加200元/票");
       }
-      return dimensionalResult("半抛", billableWeight, steps, extraFee, extraFee ? "三边超过260cm附加200元/票" : "", {
-        directBillableWeight: true,
-        tierBasisWeight: actualWeight,
-      });
+      return dimensionalResult("半抛", half.billableWeight, steps, extraFee, extraFee ? "三边超过260cm附加200元/票" : "");
     },
     tiers: [
       tier("0-2kg", 0, 2, 33, 5, 500),
@@ -898,6 +903,20 @@ function noFee(note = "", warn = false) {
   return { fee: 0, note, warn };
 }
 
+function ocsRegionFee({ ocsArea, chargeWeight }) {
+  if (ocsArea === "remote") {
+    const roundedKg = roundUpKg(chargeWeight);
+    const fee = Math.max(roundedKg * 12, 15);
+    return moneyFee(fee, `日本B2C偏远地区：12元/KG，最低15元，按${roundedKg}kg计`);
+  }
+  if (ocsArea === "out-of-area") {
+    const roundedKg = roundUpKg(chargeWeight);
+    const fee = Math.max(roundedKg * 18, 30);
+    return moneyFee(fee, `日本B2C超范围派送：18元/KG，最低30元，按${roundedKg}kg计`);
+  }
+  return noFee("OCS偏远/超范围按邮编判断，当前选择普通邮编");
+}
+
 function manualFee(note) {
   return { manual: true, note };
 }
@@ -927,8 +946,21 @@ function fullThrowWeight(actualWeight, length, width, height, divisor) {
   return Math.max(actualWeight, volumeWeight(length, width, height, divisor));
 }
 
+function halfThrowResult(actualWeight, length, width, height, divisor) {
+  const volumetricWeight = volumeWeight(length, width, height, divisor);
+  const rawHalfWeight = (volumetricWeight + actualWeight) / 2;
+  const billableWeight = Math.max(rawHalfWeight, actualWeight);
+  return {
+    billableWeight,
+    steps: [
+      `半抛原值 = (${formatNumber(volumetricWeight)} + ${formatNumber(actualWeight)}) / 2 = ${formatNumber(rawHalfWeight)}kg`,
+      `半抛计费重 = 半抛原值与实重取较大值 = ${formatNumber(billableWeight)}kg`,
+    ],
+  };
+}
+
 function halfThrowWeight(actualWeight, length, width, height, divisor) {
-  return (volumeWeight(length, width, height, divisor) + actualWeight) / 2;
+  return halfThrowResult(actualWeight, length, width, height, divisor).billableWeight;
 }
 
 function ceilToUnit(value, unit) {
