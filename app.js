@@ -423,17 +423,20 @@ const channelRules = [
     channel: "顺丰",
     participates: true,
     dimensionalRule: ({ sum, maxSide, actualWeight, length, width, height }) => {
-      if (sum > 150) return unavailableDimensional("三边和超过150cm，顺丰不可发");
-      const sfVolume = volumeWeight(length, width, height, 10000);
-      const billableWeight = Math.max(actualWeight, sfVolume);
-      const extraFee = maxSide > 120 ? 108 : 0;
-      const extraNote = extraFee ? "单边超过120cm，超长费108元/件" : "";
-      return dimensionalResult("计抛", billableWeight, [
-        `顺丰体积重 = 长 × 宽 × 高 / 10000 = ${formatNumber(sfVolume)}kg`,
-        `计费重 = 实重与顺丰体积重取较大值 = ${formatNumber(billableWeight)}kg`,
-      ], extraFee, extraNote);
+      if (sum > 160) return unavailableDimensional("三边和超过160cm，顺丰不可发");
+      if (maxSide > 120) return unavailableDimensional("单边超过120cm，顺丰不可发");
+      const half = halfThrowResult(actualWeight, length, width, height, 8000);
+      return dimensionalResult("半抛", half.billableWeight, [
+        "顺丰新标准无免抛尺寸，三边和160cm以内且单边120cm以内按半抛",
+        "顺丰抛重系数 = 8000",
+        ...half.steps,
+      ]);
     },
-    tiers: [tier("0-30kg", 0, 30, 31, 5, 500)],
+    tiers: [
+      tier("0-2kg", 0, 2, 29, 4, 500),
+      tier("2-10kg", 2, 10, 30, 4.5, 500),
+      tier("10-30kg", 10, 30, 30, 5, 500),
+    ],
     notRecommendedWhen: ({ chargeWeight }) => chargeWeight >= 10 ? "10kg以上不推荐但继续计算" : "",
     regionFee: ({ region }) => {
       if (region === "okinawa") return moneyFee(100, "冲绳偏远费100元/票");
