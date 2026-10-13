@@ -676,8 +676,9 @@ function calculateChannel(channel, input) {
 
 function resolveTier(channel, billableWeight) {
   const defaultUnit = defaultUnitKg(channel.tiers);
-  const tierWeight = ceilToUnit(billableWeight, defaultUnit);
-  const fallbackManual = channel.fallbackManual ? channel.fallbackManual({ chargeWeight: tierWeight, billableWeight }) : "";
+  const tierWeight = billableWeight;
+  const chargeWeight = ceilToUnit(billableWeight, defaultUnit);
+  const fallbackManual = channel.fallbackManual ? channel.fallbackManual({ chargeWeight, billableWeight }) : "";
   if (fallbackManual) return { manual: fallbackManual, tierWeight };
 
   for (let index = 0; index < channel.tiers.length; index += 1) {
@@ -706,7 +707,7 @@ function effectiveTierMin(previous, current) {
   const min = Number(current.min || 0);
   if (!previous || previous.max === null || previous.max === undefined) return min;
   const previousMax = Number(previous.max);
-  if (BOUNDARY_TO_NEXT_TIER.has(previousMax) && min > previousMax) return previousMax;
+  if (min > previousMax) return previousMax;
   return min;
 }
 

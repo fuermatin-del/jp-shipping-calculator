@@ -146,7 +146,7 @@
         <section class="rules-panel">
           <h2>计费边界</h2>
           <div class="rule-list">
-            <span>重量档按渠道规则匹配，计费重量再按续重单位向上取整</span>
+            <span>重量档按进位前的计费重匹配，收费重量再按渠道计费单位向上取整</span>
             <span>首重为第一个 500g 或 100g，续重次数 = 计费单位数 - 1</span>
             <span>全抛 = 实重 与 长 × 宽 × 高 ÷ 抛重系数 取较大值</span>
             <span>半抛原值 = (长 × 宽 × 高 ÷ 抛重系数 + 实重) ÷ 2，再与实重取较大值</span>
@@ -160,6 +160,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260923-sf-45"></script>
+    <script src="./app.js?v=20261013-tier-before-rounding"></script>
   </body>
 </html>
