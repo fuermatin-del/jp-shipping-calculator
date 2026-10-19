@@ -53,6 +53,35 @@ const BOUNDARY_TO_NEXT_TIER = new Set([0.5, 2.5, 5, 10]);
 
 const channelRules = [
   {
+    id: "shengxin-sagawa-5705",
+    carrier: "盛欣",
+    channel: "5705佐川普货渠道",
+    participates: true,
+    dimensionalRule: ({ sum, maxSide, actualWeight }) => {
+      if (sum < 160 && maxSide < 65) {
+        return dimensionalResult("免抛", actualWeight, [
+          `三边合 ${formatNumber(sum)}cm < 160cm 且最大边 ${formatNumber(maxSide)}cm < 65cm，免抛`,
+        ]);
+      }
+      return manualDimensional("三边合或单边超出5705渠道免抛条件，需人工确认计费方式");
+    },
+    tiers: [
+      tier("0.5-5kg", 0, 5, 33, 5, 500),
+      tier("5.5-10kg", 5.5, 10, 35.5, 5.5, 500),
+      tier("10.5-20kg", 10.5, 20, 36, 6, 500),
+      tier("20.5-30kg", 20.5, 30, 37, 6.5, 500),
+    ],
+    fallbackManual: ({ actualWeight, chargeWeight }) => actualWeight > 30 || chargeWeight > 30
+      ? "超过30kg，需人工确认"
+      : "",
+    regionFee: ({ region }) => {
+      if (region === "okinawa") {
+        return manualFee("冲绳偏远费表未注明适用于5705渠道，需人工确认");
+      }
+      return noFee();
+    },
+  },
+  {
     id: "shengxin-sagawa",
     carrier: "盛欣",
     channel: "3661佐川普货渠道",
@@ -76,9 +105,29 @@ const channelRules = [
       tier("10.5-20kg", 10.5, 20, 36, 6, 500),
       tier("20.5-30kg", 20.5, 30, 37, 6.5, 500),
     ],
-    regionFee: ({ region }) => {
+    regionFee: ({ region, chargeWeight, sum, maxSide, jpyCnyRate, jpyRateDate, jpyRateStatus }) => {
       if (region === "okinawa") {
-        return manualFee("冲绳偏远费为实报实销，需人工确认最终附加费");
+        if (sum >= 160 || maxSide > 65) {
+          return manualFee("图示冲绳费标准仅适用于三边合<160cm且单边<=65cm，超出尺寸需人工确认");
+        }
+        if (!Number.isFinite(jpyCnyRate)) {
+          return manualFee(`${jpyRateStatus || "日元汇率不可用"}，冲绳偏远费需人工确认`);
+        }
+        const surchargeBands = [
+          [2, 1000],
+          [5, 2000],
+          [10, 3000],
+          [20, 4500],
+          [30, 7500],
+        ];
+        const matchedBand = surchargeBands.find(([maxWeight]) => chargeWeight <= maxWeight + 1e-9);
+        if (!matchedBand) return manualFee("冲绳偏远费表最高为30kg，超过部分需人工确认");
+        const [maxWeight, yen] = matchedBand;
+        const fee = roundCurrency(yen * jpyCnyRate);
+        return moneyFee(
+          fee,
+          `冲绳偏远费：计费重${formatNumber(chargeWeight)}kg按${formatNumber(maxWeight)}kg档，JPY ${yen} × 汇率 ${jpyCnyRate.toFixed(6)}（${jpyRateDate}）= ${formatCurrency(fee)}`,
+        );
       }
       return noFee();
     },
@@ -143,7 +192,7 @@ const channelRules = [
     },
     tiers: [
       tier("0-2kg", 0, 2, 31, 5, 500),
-      tier("2.5-5kg", 2.5, 5, 31, 5, 500),
+      tier("2.5-5kg", 2.5, 5, 31, 5.5, 500),
       tier("5.5-10kg", 5.5, 10, 32, 5.5, 500),
       tier("10.5-20kg", 10.5, 20, 33, 7, 500),
       perKgTier("20kg以上", 20, null, 20),
@@ -219,16 +268,12 @@ const channelRules = [
       return manualDimensional("三边和超过160cm，超长费暂时不清楚，需人工确认");
     },
     tiers: [
-      tier("0-2kg", 0, 2, 31, 5, 500),
-      tier("2-5kg", 2, 5, 31, 5, 500),
+      tier("0-5kg", 0, 5, 31, 5, 500),
       tier("5-10kg", 5, 10, 31, 5.5, 500),
       tier("10-20kg", 10, 20, 31, 6, 500),
     ],
-    regionFee: ({ region, chargeWeight }) => {
-      if (region === "okinawa") {
-        const fee = Math.max(roundUpKg(chargeWeight) * 10, 150);
-        return moneyFee(fee, `冲绳偏远费10元/KG，最低150元，按${roundUpKg(chargeWeight)}kg计`);
-      }
+    regionFee: ({ region }) => {
+      if (region === "okinawa") return moneyFee(150, "冲绳偏远费150元/票");
       return noFee();
     },
   },
@@ -262,7 +307,7 @@ const channelRules = [
       }
       return unavailableDimensional("三边合达到260cm及以上，林道不可选");
     },
-    tiers: [tier("0-20kg", 0, 20, 35, 5, 500)],
+    tiers: [tier("0-30kg", 0, 30, 35, 5, 500)],
     regionFee: ({ region }) => {
       if (region === "hokkaido") return moneyFee(50, "北海道偏远费50元/票");
       if (region === "okinawa") return unavailableFee("冲绳不接");
@@ -302,22 +347,22 @@ const channelRules = [
       if (sum > 260) return unavailableDimensional("三边和超过260cm，盘古小包不可发送");
       const extraFee = oversizedPanguFee(maxSide);
       const extraNote = oversizedPanguNote(maxSide, extraFee);
-      if (sum < 140) {
-        return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 140cm，免抛`], extraFee, extraNote);
+      if (sum <= 160) {
+        return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm <= 160cm，免抛`], extraFee, extraNote);
       }
       const half = halfThrowResult(actualWeight, length, width, height, 6000);
       return dimensionalResult("半抛", half.billableWeight, [
-        `三边合 ${formatNumber(sum)}cm 达到140cm，按半抛`,
+        `三边合 ${formatNumber(sum)}cm > 160cm，按半抛`,
         ...half.steps,
       ], extraFee, extraNote);
     },
     tiers: [
-      tier("0-2kg", 0, 2, 33, 5, 500),
-      tier("2-10kg", 2, 10, 34, 5.5, 500),
+      tier("0-5kg", 0, 5, 33, 5, 500),
+      tier("5-10kg", 5, 10, 34, 5.5, 500),
       tier("10-20kg", 10, 20, 35, 6, 500),
     ],
-    fallbackManual: ({ chargeWeight }) => chargeWeight > 20
-      ? "实重/计费重20kg以上需单独确认，不参与自动推荐"
+    fallbackManual: ({ actualWeight }) => actualWeight > 20
+      ? "实重大于20kg，按商业件标准需人工确认"
       : "",
     regionFee: ({ region, chargeWeight }) => {
       if (region === "okinawa") {
@@ -332,6 +377,14 @@ const channelRules = [
       }
       return noFee();
     },
+  },
+  {
+    id: "pangu-standard-flight",
+    carrier: "盘古",
+    channel: "标准航班（全抛）",
+    manualOnly: true,
+    manualReason: "需人工确认",
+    manualDetail: "图片可辨认的参考价：文件/小件首重60元、续重15元；大货21-50kg为26元/kg、51-100kg为24元/kg、101kg以上为23元/kg。完整计费及尺寸规则待确认。",
   },
   {
     id: "pangu-post-3cm",
@@ -406,18 +459,6 @@ const channelRules = [
     manualDetail: "中外运商业件需要人工核算确认，网页不自动报价、不参与推荐。",
   },
   {
-    id: "sinotrans-pak",
-    carrier: "中外运",
-    channel: "日本邮政PAK小包（普货）",
-    participates: true,
-    dimensionalRule: ({ actualWeight }) => {
-      if (actualWeight > 3) return unavailableDimensional("重量超过3kg，中外运邮政PAK不可选");
-      return dimensionalResult("免抛", actualWeight, ["3kg内指定PAK袋/箱装，按实重计费"]);
-    },
-    tiers: [tier("0-3kg", 0, 3, 29, 6, 500)],
-    regionFee: () => noFee("日本全境无偏远"),
-  },
-  {
     id: "sf",
     carrier: "顺丰",
     channel: "顺丰",
@@ -463,6 +504,9 @@ const elements = {
   details: document.querySelector("#calculation-details"),
 };
 
+let quoteGeneration = 0;
+let fxAbortController = null;
+
 function init() {
   populatePrefectures();
   elements.form.addEventListener("input", calculateAndRender);
@@ -489,14 +533,52 @@ function resetForm() {
 }
 
 function calculateAndRender() {
+  const generation = ++quoteGeneration;
   const input = getInput();
   updateMetrics(input);
 
   if (!input.valid) {
+    fxAbortController?.abort();
     renderEmpty();
     return;
   }
 
+  if (input.region === "okinawa") {
+    fxAbortController?.abort();
+    fxAbortController = new AbortController();
+    const requestController = fxAbortController;
+    const timeoutId = setTimeout(() => {
+      if (generation === quoteGeneration) requestController.abort();
+    }, 10000);
+    renderQuotes({ ...input, jpyRateStatus: "正在获取最新日元汇率" });
+    fetch("https://api.frankfurter.dev/v2/rate/jpy/cny", {
+      cache: "no-store",
+      signal: requestController.signal,
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error(`汇率服务返回 ${response.status}`);
+        return response.json();
+      })
+      .then((data) => {
+        if (generation !== quoteGeneration) return;
+        if (data.base !== "JPY" || data.quote !== "CNY" || !Number.isFinite(data.rate) || data.rate <= 0 || !data.date) {
+          throw new Error("汇率数据格式无效");
+        }
+        renderQuotes({ ...input, jpyCnyRate: data.rate, jpyRateDate: data.date });
+      })
+      .catch((error) => {
+        if (generation !== quoteGeneration) return;
+        renderQuotes({ ...input, jpyRateStatus: "无法获取最新日元汇率" });
+      })
+      .finally(() => clearTimeout(timeoutId));
+    return;
+  }
+
+  fxAbortController?.abort();
+  renderQuotes(input);
+}
+
+function renderQuotes(input) {
   const rows = channelRules.map((channel) => calculateChannel(channel, input));
   const recommended = chooseRecommended(rows);
   const sortedRows = sortRows(rows, recommended);
@@ -575,7 +657,7 @@ function calculateChannel(channel, input) {
     ? dimensional.billableWeight
     : Math.max(input.actualWeight, dimensional.billableWeight);
   const tierBasisWeight = dimensional.tierBasisWeight ?? billableWeight;
-  const tierInfo = resolveTier(channel, tierBasisWeight);
+  const tierInfo = resolveTier(channel, tierBasisWeight, input.actualWeight);
 
   if (tierInfo.manual) {
     return manualRow(channel, tierInfo.manual, [...steps, `计费重 ${formatNumber(billableWeight)}kg，${tierInfo.manual}`]);
@@ -594,6 +676,11 @@ function calculateChannel(channel, input) {
     ocsArea: input.ocsArea,
     chargeWeight: price.chargeWeight,
     billableWeight,
+    sum: dimensions.sum,
+    maxSide: dimensions.maxSide,
+    jpyCnyRate: input.jpyCnyRate,
+    jpyRateDate: input.jpyRateDate,
+    jpyRateStatus: input.jpyRateStatus,
   }) : noFee();
 
   if (regionFee.unavailable) {
@@ -674,11 +761,11 @@ function calculateChannel(channel, input) {
   };
 }
 
-function resolveTier(channel, billableWeight) {
+function resolveTier(channel, billableWeight, actualWeight = billableWeight) {
   const defaultUnit = defaultUnitKg(channel.tiers);
   const tierWeight = billableWeight;
   const chargeWeight = ceilToUnit(billableWeight, defaultUnit);
-  const fallbackManual = channel.fallbackManual ? channel.fallbackManual({ chargeWeight, billableWeight }) : "";
+  const fallbackManual = channel.fallbackManual ? channel.fallbackManual({ chargeWeight, billableWeight, actualWeight }) : "";
   if (fallbackManual) return { manual: fallbackManual, tierWeight };
 
   for (let index = 0; index < channel.tiers.length; index += 1) {
