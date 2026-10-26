@@ -53,35 +53,6 @@ const BOUNDARY_TO_NEXT_TIER = new Set([0.5, 2.5, 5, 10]);
 
 const channelRules = [
   {
-    id: "shengxin-sagawa-5705",
-    carrier: "盛欣",
-    channel: "5705佐川普货渠道",
-    participates: true,
-    dimensionalRule: ({ sum, maxSide, actualWeight }) => {
-      if (sum < 160 && maxSide < 65) {
-        return dimensionalResult("免抛", actualWeight, [
-          `三边合 ${formatNumber(sum)}cm < 160cm 且最大边 ${formatNumber(maxSide)}cm < 65cm，免抛`,
-        ]);
-      }
-      return manualDimensional("三边合或单边超出5705渠道免抛条件，需人工确认计费方式");
-    },
-    tiers: [
-      tier("0.5-5kg", 0, 5, 33, 5, 500),
-      tier("5.5-10kg", 5.5, 10, 35.5, 5.5, 500),
-      tier("10.5-20kg", 10.5, 20, 36, 6, 500),
-      tier("20.5-30kg", 20.5, 30, 37, 6.5, 500),
-    ],
-    fallbackManual: ({ actualWeight, chargeWeight }) => actualWeight > 30 || chargeWeight > 30
-      ? "超过30kg，需人工确认"
-      : "",
-    regionFee: ({ region }) => {
-      if (region === "okinawa") {
-        return manualFee("冲绳偏远费表未注明适用于5705渠道，需人工确认");
-      }
-      return noFee();
-    },
-  },
-  {
     id: "shengxin-sagawa",
     carrier: "盛欣",
     channel: "3661佐川普货渠道",
@@ -133,42 +104,6 @@ const channelRules = [
     },
   },
   {
-    id: "shengxin-kuroneko-5cm",
-    carrier: "盛欣",
-    channel: "黑猫5CM渠道",
-    participates: true,
-    dimensionalRule: ({ actualWeight, length, width, height }) => {
-      if (!fitsBox(length, width, height, [35, 27, 5], true)) {
-        return unavailableDimensional("尺寸超过35cm x 27cm x 5cm，黑猫5CM不可选");
-      }
-      return dimensionalResult("免抛", actualWeight, ["满足35cm x 27cm x 5cm以内，按实重计费"]);
-    },
-    tiers: [tier("尺寸内不限重", 0, null, 28, 6, 500)],
-  },
-  {
-    id: "shengxin-battery",
-    carrier: "盛欣",
-    channel: "带电渠道",
-    participates: false,
-    recommendationNote: "带电渠道只展示，不参与最便宜推荐",
-    dimensionalRule: ({ sum, actualWeight, length, width, height }) => {
-      if (sum < 160) return dimensionalResult("免抛", actualWeight, [`三边合 ${formatNumber(sum)}cm < 160cm，免抛`]);
-      if (sum < 260) {
-        const half = halfThrowResult(actualWeight, length, width, height, 6000);
-        return dimensionalResult("半抛", half.billableWeight, [
-          `带电渠道沿用盛欣尺寸规则：160-260cm半抛`,
-          ...half.steps,
-        ]);
-      }
-      return unavailableDimensional("三边合达到260cm及以上，盛欣带电不可选");
-    },
-    tiers: [tier("带电渠道", 0, 30, 40, 10, 500)],
-    regionFee: ({ region }) => {
-      if (region === "okinawa") return manualFee("冲绳偏远费未提供，需人工确认");
-      return noFee();
-    },
-  },
-  {
     id: "ocs-ecommerce",
     carrier: "OCS",
     channel: "电商小包价格",
@@ -177,11 +112,11 @@ const channelRules = [
       const steps = [];
       let extraFee = 0;
       if (sum <= 140) {
-        steps.push(`三边合 ${formatNumber(sum)}cm <= 140cm，OCS 8.26规则免抛`);
+        steps.push(`三边合 ${formatNumber(sum)}cm <= 140cm，OCS 10.26规则免抛`);
         return dimensionalResult("免抛", actualWeight, steps);
       }
       const billableWeight = fullThrowWeight(actualWeight, length, width, height, 5000);
-      steps.push(`三边合 ${formatNumber(sum)}cm > 140cm，OCS 8.26规则按全抛`);
+      steps.push(`三边合 ${formatNumber(sum)}cm > 140cm，OCS 10.26规则按全抛`);
       steps.push(`OCS体积重 = 长 × 宽 × 高 / 5000 = ${formatNumber(volumeWeight(length, width, height, 5000))}kg`);
       steps.push(`全抛计费重 = 实重与OCS体积重取较大值 = ${formatNumber(billableWeight)}kg`);
       if (sum > 260) {
@@ -210,11 +145,11 @@ const channelRules = [
       const steps = [];
       let extraFee = 0;
       if (sum <= 140) {
-        steps.push(`三边合 ${formatNumber(sum)}cm <= 140cm，OCS带电8.26规则免抛`);
+        steps.push(`三边合 ${formatNumber(sum)}cm <= 140cm，OCS带电10.26规则免抛`);
         return dimensionalResult("免抛", actualWeight, steps);
       }
       const billableWeight = fullThrowWeight(actualWeight, length, width, height, 5000);
-      steps.push(`三边合 ${formatNumber(sum)}cm > 140cm，OCS带电8.26规则按全抛`);
+      steps.push(`三边合 ${formatNumber(sum)}cm > 140cm，OCS带电10.26规则按全抛`);
       steps.push(`OCS体积重 = 长 × 宽 × 高 / 5000 = ${formatNumber(volumeWeight(length, width, height, 5000))}kg`);
       steps.push(`全抛计费重 = 实重与OCS体积重取较大值 = ${formatNumber(billableWeight)}kg`);
       if (sum > 260) {
@@ -268,9 +203,10 @@ const channelRules = [
       return manualDimensional("三边和超过160cm，超长费暂时不清楚，需人工确认");
     },
     tiers: [
-      tier("0-5kg", 0, 5, 31, 5, 500),
-      tier("5-10kg", 5, 10, 31, 5.5, 500),
-      tier("10-20kg", 10, 20, 31, 6, 500),
+      tier("0-2kg", 0, 2, 31, 5.5, 500),
+      tier("2-5kg", 2, 5, 31, 6.5, 500),
+      tier("5-10kg", 5, 10, 31, 7, 500),
+      tier("10-20kg", 10, 20, 31, 8, 500),
     ],
     regionFee: ({ region }) => {
       if (region === "okinawa") return moneyFee(150, "冲绳偏远费150元/票");
@@ -357,7 +293,7 @@ const channelRules = [
       ], extraFee, extraNote);
     },
     tiers: [
-      tier("0-5kg", 0, 5, 33, 5, 500),
+      tier("0-5kg", 0, 5, 33, 6, 500),
       tier("5-10kg", 5, 10, 34, 5.5, 500),
       tier("10-20kg", 10, 20, 35, 6, 500),
     ],
@@ -389,12 +325,12 @@ const channelRules = [
   {
     id: "pangu-post-3cm",
     carrier: "盘古",
-    channel: "日本邮政3CM投函件",
+    channel: "日本黑猫3CM投函件",
     participates: true,
     dimensionalRule: ({ actualWeight, length, width, height }) => {
-      if (actualWeight > 1) return unavailableDimensional("重量超过1kg，盘古日本邮政3CM不可选");
+      if (actualWeight > 1) return unavailableDimensional("重量超过1kg，盘古日本黑猫3CM不可选");
       if (!fitsBox(length, width, height, [29.7, 21, 3], true)) {
-        return unavailableDimensional("尺寸超过A4纸大小或厚度超过3cm，盘古日本邮政3CM不可选");
+        return unavailableDimensional("尺寸超过A4纸大小或厚度超过3cm，盘古日本黑猫3CM不可选");
       }
       return dimensionalResult("免抛", actualWeight, ["厚3cm内、A4纸大小、1kg以内，按实重计费"]);
     },
